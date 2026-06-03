@@ -3,6 +3,7 @@ export function buildBookmarklet(origin: string): string {
 const clean=function(value){return (value||'').replace(/\\s+/g,' ').trim();};
 const text=function(element){return clean(element&&element.innerText||element&&element.textContent||'');};
 const htmlToText=function(html){const div=document.createElement('div');div.innerHTML=html||'';return text(div);};
+const optional=function(fn){try{return fn()||'';}catch(error){return '';}};
 const pick=function(selectors){for(const selector of selectors){const found=text(document.querySelector(selector));if(found)return found;}return '';};
 const labeledCell=function(labels){const terms=labels.map(function(label){return label.toLowerCase().replace(/:$/,'');});const labelsNodes=Array.from(document.querySelectorAll('.LIST_TITLE,td,th,dt,label'));for(const node of labelsNodes){const label=text(node).toLowerCase().replace(/:$/,'');if(terms.indexOf(label)===-1)continue;if(node.tagName&&node.tagName.toLowerCase()==='dt'&&node.nextElementSibling){const dd=text(node.nextElementSibling);if(dd)return dd;}const row=node.closest&&node.closest('tr');if(row){const cells=Array.from(row.children);const index=cells.indexOf(node.closest('td,th')||node);if(index>-1&&cells[index+1]){const value=text(cells[index+1]);if(value&&terms.indexOf(value.toLowerCase().replace(/:$/,''))===-1)return value;}}}return '';};
 const labeled=function(labels){const direct=labeledCell(labels);if(direct)return direct;const terms=labels.map(function(label){return label.toLowerCase().replace(/:$/,'');});const nodes=Array.from(document.querySelectorAll('tr,li,p,dt,dd'));for(let i=0;i<nodes.length;i++){const current=text(nodes[i]);const lower=current.toLowerCase().replace(/:$/,'');if(terms.indexOf(lower)>-1&&nodes[i+1]){const next=text(nodes[i+1]);if(next&&next.toLowerCase()!==lower)return next;}for(const term of terms){if(lower.indexOf(term+':')===0){const value=clean(current.slice(term.length+1));if(value)return value;}}}return '';};
@@ -22,9 +23,9 @@ tender_link:location.href,
 closing_date:closingDate(closes),
 closing_date_text:closes,
 description:tenderDescription()||text(document.querySelector('main')).slice(0,2000)||text(document.body).slice(0,2000),
-contact_person:contactPerson(),
-contact_phone:contactPhone(),
-contact_email:contactEmail(),
+contact_person:optional(contactPerson),
+contact_phone:optional(contactPhone),
+contact_email:optional(contactEmail),
 document_links:links
 };
 window.open('${origin}/rfp/new#import='+encodeURIComponent(JSON.stringify(payload)),'_blank');
