@@ -2,7 +2,7 @@ import { getSupabase } from "@/lib/supabase";
 import type { Rfp, RfpImportInput, RfpInput, TenderDocumentLink } from "@/lib/types";
 
 const selectFields =
-  "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, document_links, summary, summary_generated_at, notes, pipeline_stage, created_at";
+  "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, contact_person, contact_phone, contact_email, document_links, summary, summary_generated_at, notes, pipeline_stage, created_at";
 const legacySelectFields = "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, notes, pipeline_stage, created_at";
 
 function withRfpDefaults(rfp: Partial<Rfp>): Rfp {
@@ -15,6 +15,9 @@ function withRfpDefaults(rfp: Partial<Rfp>): Rfp {
     tender_link: rfp.tender_link ?? null,
     gdrive_link: rfp.gdrive_link ?? null,
     description: rfp.description ?? null,
+    contact_person: rfp.contact_person ?? null,
+    contact_phone: rfp.contact_phone ?? null,
+    contact_email: rfp.contact_email ?? null,
     document_links: normalizeDocumentLinks(rfp.document_links),
     summary: rfp.summary ?? null,
     summary_generated_at: rfp.summary_generated_at ?? null,
@@ -91,6 +94,9 @@ export function normalizeImportedRfp(input: RfpImportInput): RfpInput {
     tender_link: input.tender_link ?? null,
     gdrive_link: input.gdrive_link ?? null,
     description: input.description ?? null,
+    contact_person: input.contact_person ?? null,
+    contact_phone: input.contact_phone ?? null,
+    contact_email: input.contact_email ?? null,
     document_links: normalizeDocumentLinks(input.document_links),
     summary: input.summary ?? null,
     summary_generated_at: input.summary_generated_at ?? null,

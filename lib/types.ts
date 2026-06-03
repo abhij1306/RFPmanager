@@ -10,6 +10,9 @@ export type Rfp = {
   tender_link: string | null;
   gdrive_link: string | null;
   description: string | null;
+  contact_person: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
   document_links: TenderDocumentLink[];
   summary: string | null;
   summary_generated_at: string | null;
@@ -26,6 +29,9 @@ export type RfpInput = {
   tender_link: string | null;
   gdrive_link: string | null;
   description: string | null;
+  contact_person: string | null;
+  contact_phone: string | null;
+  contact_email: string | null;
   document_links: TenderDocumentLink[];
   summary: string | null;
   summary_generated_at: string | null;

@@ -12,6 +12,9 @@ const emptyInput: RfpInput = {
   tender_link: null,
   gdrive_link: null,
   description: null,
+  contact_person: null,
+  contact_phone: null,
+  contact_email: null,
   document_links: [],
   summary: null,
   summary_generated_at: null,
@@ -61,6 +64,9 @@ function readDraftFromHash(): RfpInput | null {
       tender_code: cleanString(payload.tender_code),
       tender_link: cleanString(payload.tender_link),
       description: cleanString(payload.description),
+      contact_person: cleanString(payload.contact_person),
+      contact_phone: cleanString(payload.contact_phone),
+      contact_email: cleanString(payload.contact_email),
       document_links: cleanLinks(payload.document_links),
     };
   } catch {

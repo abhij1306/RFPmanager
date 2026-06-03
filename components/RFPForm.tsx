@@ -14,6 +14,9 @@ const emptyInput: RfpInput = {
   tender_link: null,
   gdrive_link: null,
   description: null,
+  contact_person: null,
+  contact_phone: null,
+  contact_email: null,
   document_links: [],
   summary: null,
   summary_generated_at: null,
@@ -39,6 +42,9 @@ function inputFromRfp(rfp?: Rfp | null): RfpInput {
     tender_link: rfp.tender_link,
     gdrive_link: rfp.gdrive_link,
     description: rfp.description,
+    contact_person: rfp.contact_person,
+    contact_phone: rfp.contact_phone,
+    contact_email: rfp.contact_email,
     document_links: rfp.document_links,
     summary: rfp.summary,
     summary_generated_at: rfp.summary_generated_at,
@@ -73,6 +79,9 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
       tender_link: cleanValue(form.tender_link ?? ""),
       gdrive_link: cleanValue(form.gdrive_link ?? ""),
       description: cleanValue(form.description ?? ""),
+      contact_person: cleanValue(form.contact_person ?? ""),
+      contact_phone: cleanValue(form.contact_phone ?? ""),
+      contact_email: cleanValue(form.contact_email ?? ""),
       notes: cleanValue(form.notes ?? ""),
       pipeline_stage: form.pipeline_stage,
     };
@@ -219,6 +228,34 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
             id="description"
             onChange={(event) => setField("description", event.target.value)}
             value={form.description ?? ""}
+          />
+        </div>
+        <div className="form-field">
+          <label htmlFor="contact_person">Contact Person</label>
+          <input
+            className="input"
+            id="contact_person"
+            onChange={(event) => setField("contact_person", event.target.value)}
+            value={form.contact_person ?? ""}
+          />
+        </div>
+        <div className="form-field">
+          <label htmlFor="contact_phone">Phone</label>
+          <input
+            className="input"
+            id="contact_phone"
+            onChange={(event) => setField("contact_phone", event.target.value)}
+            value={form.contact_phone ?? ""}
+          />
+        </div>
+        <div className="form-field full">
+          <label htmlFor="contact_email">Email</label>
+          <input
+            className="input"
+            id="contact_email"
+            onChange={(event) => setField("contact_email", event.target.value)}
+            type="email"
+            value={form.contact_email ?? ""}
           />
         </div>
         <div className="form-field full">

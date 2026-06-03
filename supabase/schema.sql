@@ -7,6 +7,9 @@ create table if not exists rfps (
   tender_link text,
   gdrive_link text,
   description text,
+  contact_person text,
+  contact_phone text,
+  contact_email text,
   document_links jsonb not null default '[]'::jsonb,
   summary text,
   summary_generated_at timestamptz,
@@ -16,6 +19,9 @@ create table if not exists rfps (
 );
 
 alter table rfps add column if not exists description text;
+alter table rfps add column if not exists contact_person text;
+alter table rfps add column if not exists contact_phone text;
+alter table rfps add column if not exists contact_email text;
 alter table rfps add column if not exists document_links jsonb not null default '[]'::jsonb;
 alter table rfps add column if not exists summary text;
 alter table rfps add column if not exists summary_generated_at timestamptz;
