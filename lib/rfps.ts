@@ -42,11 +42,39 @@ function parseClosingDate(value?: string | null): string | null {
     return null;
   }
 
-  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return value;
+  const trimmed = value.trim();
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+    return trimmed;
   }
 
-  const parsed = new Date(value);
+  const closesMatch = trimmed.match(/(?:closes\s+)?(?:[A-Za-z]{3,9},?\s+)?(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})/i);
+  const parseable = closesMatch?.[1] ?? trimmed;
+  const auDateMatch = parseable.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/);
+
+  if (auDateMatch) {
+    const [, day, monthName, year] = auDateMatch;
+    const month = [
+      "jan",
+      "feb",
+      "mar",
+      "apr",
+      "may",
+      "jun",
+      "jul",
+      "aug",
+      "sep",
+      "oct",
+      "nov",
+      "dec",
+    ].indexOf(monthName.slice(0, 3).toLowerCase());
+
+    if (month > -1) {
+      return `${year}-${String(month + 1).padStart(2, "0")}-${day.padStart(2, "0")}`;
+    }
+  }
+
+  const parsed = new Date(parseable);
   if (Number.isNaN(parsed.getTime())) {
     return null;
   }
