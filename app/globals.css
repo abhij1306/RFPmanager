@@ -440,8 +440,46 @@ nav a:hover {
   text-align: center;
 }
 
+.bookmarklet-grid {
+  display: grid;
+  grid-template-columns: minmax(420px, 1fr) minmax(300px, 0.72fr);
+  gap: 14px;
+}
+
+.bookmarklet-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.bookmarklet-panel h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.bookmarklet-panel p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.bookmarklet-code {
+  min-height: 260px;
+}
+
+.steps-list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--text);
+  line-height: 1.8;
+}
+
 @media (max-width: 960px) {
   .detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .bookmarklet-grid {
     grid-template-columns: 1fr;
   }
 }

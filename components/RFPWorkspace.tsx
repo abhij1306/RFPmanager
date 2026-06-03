@@ -22,8 +22,11 @@ export function RFPWorkspace({
   const [documentList, setDocumentList] = useState(documents);
   const [commentBody, setCommentBody] = useState("");
   const [activeDocument, setActiveDocument] = useState<RfpDocument | null>(documents[0] ?? null);
+  const [summary, setSummary] = useState(rfp.summary ?? "");
+  const [summaryGeneratedAt, setSummaryGeneratedAt] = useState(rfp.summary_generated_at);
   const [message, setMessage] = useState<string | null>(null);
   const [isPosting, setIsPosting] = useState(false);
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   async function addComment() {
     const body = commentBody.trim();
@@ -62,9 +65,75 @@ export function RFPWorkspace({
     }
   }
 
+  async function generateSummary() {
+    const markdown = activeDocument?.markdown ?? documentList.map((document) => `# ${document.title}\n\n${document.markdown}`).join("\n\n");
+
+    if (!markdown.trim()) {
+      setMessage("Save converted markdown before generating a summary.");
+      return;
+    }
+
+    setIsSummarizing(true);
+    setMessage(null);
+
+    try {
+      const response = await fetch("/api/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rfp_id: rfp.id, markdown }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error ?? "Could not generate summary.");
+      }
+
+      setSummary(data.summary);
+      setSummaryGeneratedAt(data.rfp?.summary_generated_at ?? new Date().toISOString());
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not generate summary.");
+    } finally {
+      setIsSummarizing(false);
+    }
+  }
+
   return (
     <aside className="workspace-panel">
       {message ? <div className="notice error">{message}</div> : null}
+
+      <section className="workspace-section">
+        <div className="section-heading">
+          <div>
+            <h2>Summary</h2>
+            <p>{summaryGeneratedAt ? `Generated ${formatDate(summaryGeneratedAt)}` : "Generate from saved markdown"}</p>
+          </div>
+          <button className="button compact-button" disabled={isSummarizing} onClick={() => void generateSummary()} type="button">
+            {isSummarizing ? "Generating..." : "Generate"}
+          </button>
+        </div>
+        {summary ? <textarea className="markdown-preview document-preview" readOnly value={summary} /> : <div className="empty-library">No summary generated yet.</div>}
+      </section>
+
+      <section className="workspace-section">
+        <div className="section-heading">
+          <div>
+            <h2>Tender Links</h2>
+            <p>{rfp.document_links.length} imported document URLs</p>
+          </div>
+        </div>
+        <div className="document-list compact-list">
+          {rfp.document_links.map((link) => (
+            <a className="document-row" href={link.url} key={`${link.name}-${link.url}`} rel="noreferrer" target="_blank">
+              <div className="file-icon">URL</div>
+              <span className="document-main">
+                <span className="document-title">{link.name || link.url}</span>
+                <span className="document-meta">{link.url}</span>
+              </span>
+            </a>
+          ))}
+          {rfp.document_links.length === 0 ? <div className="empty-library">Imported tender document links will appear here.</div> : null}
+        </div>
+      </section>
 
       <section className="workspace-section">
         <div className="section-heading">

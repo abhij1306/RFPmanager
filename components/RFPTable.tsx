@@ -121,7 +121,7 @@ export function RFPTable({
                   </td>
                   <td>
                     <Link className="count-link" href={`/rfp/${rfp.id}`}>
-                      {documentCounts[rfp.id] ?? 0}
+                      {(documentCounts[rfp.id] ?? 0) + rfp.document_links.length}
                     </Link>
                   </td>
                 </tr>

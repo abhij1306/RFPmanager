@@ -23,6 +23,7 @@ export default function RootLayout({
           <nav aria-label="Primary navigation">
             <Link href="/">Tracker</Link>
             <Link href="/convert">Converter</Link>
+            <Link href="/bookmarklet">Import</Link>
           </nav>
         </header>
         <main>{children}</main>

@@ -8,6 +8,8 @@ A small team tool for managing RFP opportunities and converting RFP documents in
 - Add, edit, delete, filter, and open linked tender or Google Drive records.
 - Save comments and converted Markdown documents against each RFP.
 - Client-side DOCX/PDF/Excel/CSV to Markdown converter.
+- Browser bookmarklet for importing tender details and document links from tender pages.
+- Groq-powered summary generation from saved Markdown.
 - Vercel-ready Next.js App Router project.
 
 ## Local Setup
@@ -26,9 +28,11 @@ cp .env.example .env.local
 
 3. Add your Supabase URL and anon key to `.env.local`.
 
-4. Create or update the database tables using [supabase/schema.sql](supabase/schema.sql).
+4. Add `GROQ_API_KEY` to enable summary generation.
 
-5. Run the app:
+5. Create or update the database tables using [supabase/schema.sql](supabase/schema.sql).
+
+6. Run the app:
 
 ```bash
 npm run dev
@@ -47,7 +51,12 @@ The schema enables Row Level Security and allows anonymous team access for this 
 3. Add these environment variables:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `GROQ_API_KEY`
 4. Deploy.
+
+## Tender Import
+
+Open `/bookmarklet`, copy the generated bookmarklet, and paste it into a browser bookmark URL. On a tender page, click the bookmark to send tender details and document links to `/api/rfp`; the app creates the RFP and opens its detail page.
 
 ## Scripts
 

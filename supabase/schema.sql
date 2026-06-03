@@ -6,10 +6,19 @@ create table if not exists rfps (
   tender_code text,
   tender_link text,
   gdrive_link text,
+  description text,
+  document_links jsonb not null default '[]'::jsonb,
+  summary text,
+  summary_generated_at timestamptz,
   notes text,
   pipeline_stage text not null default 'Prospects' check (pipeline_stage in ('Prospects', 'Active', 'Submitted', 'Won', 'Lost')),
   created_at timestamptz not null default now()
 );
+
+alter table rfps add column if not exists description text;
+alter table rfps add column if not exists document_links jsonb not null default '[]'::jsonb;
+alter table rfps add column if not exists summary text;
+alter table rfps add column if not exists summary_generated_at timestamptz;
 
 create table if not exists rfp_documents (
   id uuid primary key default gen_random_uuid(),

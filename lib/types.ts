@@ -9,6 +9,10 @@ export type Rfp = {
   tender_code: string | null;
   tender_link: string | null;
   gdrive_link: string | null;
+  description: string | null;
+  document_links: TenderDocumentLink[];
+  summary: string | null;
+  summary_generated_at: string | null;
   notes: string | null;
   pipeline_stage: PipelineStage;
   created_at: string;
@@ -21,8 +25,22 @@ export type RfpInput = {
   tender_code: string | null;
   tender_link: string | null;
   gdrive_link: string | null;
+  description: string | null;
+  document_links: TenderDocumentLink[];
+  summary: string | null;
+  summary_generated_at: string | null;
   notes: string | null;
   pipeline_stage: PipelineStage;
+};
+
+export type TenderDocumentLink = {
+  name: string;
+  url: string;
+};
+
+export type RfpImportInput = Partial<RfpInput> & {
+  client_name: string;
+  closing_date_text?: string | null;
 };
 
 export type RfpDocumentSourceType = "docx" | "pdf" | "xlsx" | "csv" | "markdown";

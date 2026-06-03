@@ -13,6 +13,10 @@ const emptyInput: RfpInput = {
   tender_code: null,
   tender_link: null,
   gdrive_link: null,
+  description: null,
+  document_links: [],
+  summary: null,
+  summary_generated_at: null,
   notes: null,
   pipeline_stage: "Prospects",
 };
@@ -34,6 +38,10 @@ function inputFromRfp(rfp?: Rfp | null): RfpInput {
     tender_code: rfp.tender_code,
     tender_link: rfp.tender_link,
     gdrive_link: rfp.gdrive_link,
+    description: rfp.description,
+    document_links: rfp.document_links,
+    summary: rfp.summary,
+    summary_generated_at: rfp.summary_generated_at,
     notes: rfp.notes,
     pipeline_stage: rfp.pipeline_stage,
   };
@@ -62,6 +70,7 @@ export function RFPForm({ rfp }: { rfp?: Rfp | null }) {
       tender_code: cleanValue(form.tender_code ?? ""),
       tender_link: cleanValue(form.tender_link ?? ""),
       gdrive_link: cleanValue(form.gdrive_link ?? ""),
+      description: cleanValue(form.description ?? ""),
       notes: cleanValue(form.notes ?? ""),
     };
 
@@ -180,6 +189,15 @@ export function RFPForm({ rfp }: { rfp?: Rfp | null }) {
             onChange={(event) => setField("gdrive_link", event.target.value)}
             type="url"
             value={form.gdrive_link ?? ""}
+          />
+        </div>
+        <div className="form-field full">
+          <label htmlFor="description">Tender Description</label>
+          <textarea
+            className="textarea"
+            id="description"
+            onChange={(event) => setField("description", event.target.value)}
+            value={form.description ?? ""}
           />
         </div>
         <div className="form-field full">
