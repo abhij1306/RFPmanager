@@ -9,19 +9,19 @@ const labeled=function(labels){const direct=labeledCell(labels);if(direct)return
 const tenderTitle=function(){const subtitle=Array.from(document.querySelectorAll('.subtitle .h2,th.h2')).map(text).filter(Boolean).find(function(value){return !/^(description|enquiries|responses|specification documents)$/i.test(value)&&value.indexOf('Help Icon')===-1;});if(subtitle)return subtitle.replace(/\\s*Issued by\\s*/i,' - Issued by ');return labeled(['Title','Tender title','Description title'])||pick(['h1','.title','.tender-title'])||document.title;};
 const tenderDescription=function(){const desc=document.querySelector('#desc');if(desc&&'value' in desc){const value=htmlToText(desc.value);if(value)return value;}const descriptionTable=document.querySelector('#description');if(descriptionTable){const value=text(descriptionTable.querySelector('textarea'))||text(descriptionTable);if(value)return value.replace(/^Description\\s*/i,'');}return labeled(['Description','Tender Description']);};
 const closingText=function(){const closes=Array.from(document.querySelectorAll('strong,span,td,p,div')).map(text).find(function(value){return /^closes\\b/i.test(value);});return closes||labeled(['Closing date','Closing','Deadline'])||pick(['[class*="closing"]','[class*="close-date"]','[class*="deadline"]']);};
+const closingDate=function(value){const match=(value||'').match(/(?:closes\\s+)?(?:[A-Za-z]{3,9},?\\s+)?(\\d{1,2})\\s+([A-Za-z]{3,9})\\s+(\\d{4})/i);if(!match)return '';const month=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(match[2].slice(0,3).toLowerCase());if(month<0)return '';return match[3]+'-'+String(month+1).padStart(2,'0')+'-'+String(match[1]).padStart(2,'0');};
 const links=Array.from(document.querySelectorAll('a[href]')).map(function(anchor){return {name:clean(anchor.textContent||anchor.getAttribute('download')||anchor.href),url:anchor.href};}).filter(function(link){const haystack=(link.url+' '+link.name).toLowerCase();return !/^skip to /i.test(link.name)&&!/help\\.docx|javascript:void/i.test(haystack)&&/download|document|attachment|pdf|docx|xlsx|xls|csv|request-spec-docs|downloadspecs/.test(haystack);});
+const closes=closingText();
 const payload={
 client_name:tenderTitle(),
 tender_code:labeledCell(['Number','Tender number','Reference','Tender code'])||labeled(['Tender number','Reference','Tender code'])||pick(['[class*="reference"]','[class*="ref"]']),
 tender_link:location.href,
-closing_date_text:closingText(),
+closing_date:closingDate(closes),
+closing_date_text:closes,
 description:tenderDescription()||text(document.querySelector('main')).slice(0,2000)||text(document.body).slice(0,2000),
 document_links:links
 };
-fetch('${origin}/api/rfp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-.then(function(response){return response.json().then(function(data){if(!response.ok)throw new Error(data.error||'Save failed');return data;});})
-.then(function(data){window.open('${origin}/rfp/'+data.id,'_blank');})
-.catch(function(error){alert('RFP import failed: '+error.message);});
+window.open('${origin}/rfp/new#import='+encodeURIComponent(JSON.stringify(payload)),'_blank');
 })();`;
 
   return `javascript:${encodeURIComponent(script)}`;

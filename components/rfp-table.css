@@ -9,7 +9,7 @@
 
 table {
   width: 100%;
-  min-width: 980px;
+  min-width: 1040px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 13px;
@@ -120,6 +120,29 @@ tbody tr:hover {
   border: 1px solid #d2e3fc;
   border-radius: 999px;
   font-weight: 800;
+}
+
+.icon-danger-button {
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  color: var(--danger);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.icon-danger-button:hover:not(:disabled) {
+  background: #fce8e6;
+  border-color: #f4c7c3;
+}
+
+.icon-danger-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .empty {

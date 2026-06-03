@@ -1,4 +1,4 @@
-import { RFPForm } from "@/components/RFPForm";
+import { RFPImportDraft } from "@/components/RFPImportDraft";
 
 export default function NewRfpPage() {
   return (
@@ -9,7 +9,7 @@ export default function NewRfpPage() {
           <p>Create a shared record for a new tender or opportunity.</p>
         </div>
       </section>
-      <RFPForm />
+      <RFPImportDraft />
     </div>
   );
 }

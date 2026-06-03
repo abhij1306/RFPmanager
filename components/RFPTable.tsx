@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { closingDateState, isClosingSoon } from "@/lib/date";
+import { deleteRfp } from "@/lib/rfps";
 import type { Rfp } from "@/lib/types";
 import "./rfp-table.css";
 
@@ -31,8 +33,10 @@ export function RFPTable({
   documentCounts: Record<string, number>;
   rfps: Rfp[];
 }) {
+  const router = useRouter();
   const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const filteredRfps = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -43,6 +47,21 @@ export function RFPTable({
       return matchesFilter && (!normalizedQuery || searchable.includes(normalizedQuery));
     });
   }, [filter, query, rfps]);
+
+  async function onDelete(rfp: Rfp) {
+    if (!window.confirm(`Delete ${rfp.client_name}?`)) {
+      return;
+    }
+
+    setDeletingId(rfp.id);
+
+    try {
+      await deleteRfp(rfp.id);
+      router.refresh();
+    } finally {
+      setDeletingId(null);
+    }
+  }
 
   return (
     <>
@@ -80,6 +99,7 @@ export function RFPTable({
               <th>Pipeline Stage</th>
               <th>Comments</th>
               <th>Docs</th>
+              <th aria-label="Actions" />
             </tr>
           </thead>
           <tbody>
@@ -124,12 +144,30 @@ export function RFPTable({
                       {(documentCounts[rfp.id] ?? 0) + rfp.document_links.length}
                     </Link>
                   </td>
+                  <td>
+                    <button
+                      aria-label={`Delete ${rfp.client_name}`}
+                      className="icon-danger-button"
+                      disabled={deletingId === rfp.id}
+                      onClick={() => void onDelete(rfp)}
+                      title="Delete RFP"
+                      type="button"
+                    >
+                      <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
+                        <path d="M4 7h16" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                        <path d="M10 11v6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                        <path d="M14 11v6" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                        <path d="M6 7l1 14h10l1-14" stroke="currentColor" strokeLinejoin="round" strokeWidth="2" />
+                        <path d="M9 7V4h6v3" stroke="currentColor" strokeLinejoin="round" strokeWidth="2" />
+                      </svg>
+                    </button>
+                  </td>
                 </tr>
               );
             })}
             {filteredRfps.length === 0 ? (
               <tr>
-                <td className="empty" colSpan={8}>
+                <td className="empty" colSpan={9}>
                   No RFPs match this view.
                 </td>
               </tr>

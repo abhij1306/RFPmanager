@@ -47,9 +47,9 @@ function inputFromRfp(rfp?: Rfp | null): RfpInput {
   };
 }
 
-export function RFPForm({ rfp }: { rfp?: Rfp | null }) {
+export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: Rfp | null }) {
   const router = useRouter();
-  const [form, setForm] = useState<RfpInput>(() => inputFromRfp(rfp));
+  const [form, setForm] = useState<RfpInput>(() => initialInput ?? inputFromRfp(rfp));
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
