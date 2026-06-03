@@ -1,0 +1,93 @@
+.search-input {
+  max-width: 320px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 850px;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: middle;
+}
+
+th {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+tbody tr:hover {
+  background: rgba(56, 189, 248, 0.06);
+}
+
+.row-link {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.row-link:hover,
+.link-list a:hover {
+  color: var(--accent);
+}
+
+.status {
+  display: inline-flex;
+  min-width: 48px;
+  justify-content: center;
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+.status-yes {
+  color: #bbf7d0;
+  border-color: rgba(52, 211, 153, 0.5);
+}
+
+.status-no {
+  color: #fecaca;
+  border-color: rgba(248, 113, 113, 0.5);
+}
+
+.status-tbd {
+  color: #fde68a;
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.date-overdue {
+  color: var(--danger);
+  font-weight: 700;
+}
+
+.date-soon {
+  color: var(--warning);
+  font-weight: 700;
+}
+
+.link-list {
+  display: flex;
+  gap: 12px;
+}
+
+.link-list a {
+  color: var(--accent);
+}
+
+.empty {
+  padding: 40px 16px;
+  color: var(--muted);
+  text-align: center;
+}
