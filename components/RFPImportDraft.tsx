@@ -89,5 +89,9 @@ export function RFPImportDraft() {
     () => null,
   );
 
-  return <RFPForm initialInput={initialInput ?? undefined} />;
+  const formKey = initialInput
+    ? `import:${initialInput.tender_link ?? initialInput.tender_code ?? initialInput.client_name}`
+    : "empty";
+
+  return <RFPForm key={formKey} initialInput={initialInput ?? undefined} />;
 }
