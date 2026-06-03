@@ -38,6 +38,32 @@ create table if not exists rfp_comments (
   created_at timestamptz not null default now()
 );
 
+create index if not exists rfp_documents_rfp_id_created_at_idx
+  on rfp_documents (rfp_id, created_at desc);
+
+create index if not exists rfp_comments_rfp_id_created_at_idx
+  on rfp_comments (rfp_id, created_at desc);
+
+create or replace function list_document_counts_by_rfp()
+returns table (rfp_id uuid, count bigint)
+language sql
+stable
+as $$
+  select rfp_documents.rfp_id, count(*)
+  from rfp_documents
+  group by rfp_documents.rfp_id;
+$$;
+
+create or replace function list_comment_counts_by_rfp()
+returns table (rfp_id uuid, count bigint)
+language sql
+stable
+as $$
+  select rfp_comments.rfp_id, count(*)
+  from rfp_comments
+  group by rfp_comments.rfp_id;
+$$;
+
 alter table rfps enable row level security;
 alter table rfp_documents enable row level security;
 alter table rfp_comments enable row level security;

@@ -1,53 +1,17 @@
-import { getSupabase } from "@/lib/supabase";
+import { createTableHelpers, listCountsByRfp, type RfpCount } from "@/lib/table-helpers";
 import type { RfpDocument, RfpDocumentInput } from "@/lib/types";
 
 const selectFields = "id, rfp_id, title, source_filename, source_type, markdown, created_at";
+const helpers = createTableHelpers<RfpDocument, RfpDocumentInput>("rfp_documents", selectFields);
 
-export async function listDocuments(): Promise<RfpDocument[]> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("rfp_documents")
-    .select(selectFields)
-    .order("created_at", { ascending: false });
+export const listDocuments = helpers.list;
 
-  if (error) {
-    throw error;
-  }
+export const listDocumentsByRfp = helpers.listByRfp;
 
-  return data ?? [];
-}
+export const createDocument = helpers.create;
 
-export async function listDocumentsByRfp(rfpId: string): Promise<RfpDocument[]> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("rfp_documents")
-    .select(selectFields)
-    .eq("rfp_id", rfpId)
-    .order("created_at", { ascending: false });
+export const deleteDocument = helpers.remove;
 
-  if (error) {
-    throw error;
-  }
-
-  return data ?? [];
-}
-
-export async function createDocument(input: RfpDocumentInput): Promise<RfpDocument> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase.from("rfp_documents").insert(input).select(selectFields).single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
-}
-
-export async function deleteDocument(id: string): Promise<void> {
-  const supabase = getSupabase();
-  const { error } = await supabase.from("rfp_documents").delete().eq("id", id);
-
-  if (error) {
-    throw error;
-  }
+export function listDocumentCountsByRfp(): Promise<RfpCount[]> {
+  return listCountsByRfp("list_document_counts_by_rfp");
 }

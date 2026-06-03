@@ -30,9 +30,9 @@ function sheetRowsToMarkdown(sheetName: string, rows: unknown[][]): string {
   const columnCount = Math.max(...populatedRows.map((row) => row.length));
   const normalizedRows = populatedRows.map((row) => Array.from({ length: columnCount }, (_, index) => row[index] ?? ""));
   const [firstRow, ...bodyRows] = normalizedRows;
-  const header = firstRow.some(Boolean) ? firstRow : normalizedRows[0].map((_, index) => `Column ${index + 1}`);
+  const header = firstRow;
   const separator = header.map(() => "---");
-  const body = bodyRows.length ? bodyRows : [[""]];
+  const body = bodyRows.length ? bodyRows : [Array.from({ length: columnCount }, () => "")];
 
   return [
     `## ${sheetName}`,
@@ -219,8 +219,22 @@ export function DocConverter({ documents, rfps }: { documents: RfpDocument[]; rf
       return;
     }
 
-    await deleteDocument(id);
-    setSavedDocuments((current) => current.filter((document) => document.id !== id));
+    try {
+      await deleteDocument(id);
+      setSavedDocuments((current) => current.filter((document) => document.id !== id));
+      setMessage("Saved markdown deleted.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Could not delete this saved markdown.");
+    }
+  }
+
+  function openDocument(document: RfpDocument) {
+    setMarkdown(document.markdown);
+    setSourceType(document.source_type);
+    setTitle(document.title);
+    setFileName(document.source_filename ?? "");
+    setSelectedRfpId(document.rfp_id);
+    setMessage(null);
   }
 
   return (
@@ -305,7 +319,7 @@ export function DocConverter({ documents, rfps }: { documents: RfpDocument[]; rf
                   {rfpNames.get(document.rfp_id) ?? "Unknown RFP"} · {document.source_type.toUpperCase()} · {formatDate(document.created_at)}
                 </div>
               </div>
-              <button className="ghost-button compact-button" onClick={() => setMarkdown(document.markdown)} type="button">
+              <button className="ghost-button compact-button" onClick={() => openDocument(document)} type="button">
                 Open
               </button>
               <button className="ghost-button compact-button" onClick={() => void removeDocument(document.id)} type="button">

@@ -1,23 +1,23 @@
 import Link from "next/link";
 import { RFPTable } from "@/components/RFPTable";
-import { listComments } from "@/lib/comments";
-import { listDocuments } from "@/lib/documents";
+import { listCommentCountsByRfp } from "@/lib/comments";
+import { listDocumentCountsByRfp } from "@/lib/documents";
 import { listRfps } from "@/lib/rfps";
-import type { Rfp, RfpComment, RfpDocument } from "@/lib/types";
+import type { Rfp } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-function countByRfpId(items: Array<{ rfp_id: string }>): Record<string, number> {
+function mapCountsByRfpId(items: Array<{ rfp_id: string; count: number }>): Record<string, number> {
   return items.reduce<Record<string, number>>((counts, item) => {
-    counts[item.rfp_id] = (counts[item.rfp_id] ?? 0) + 1;
+    counts[item.rfp_id] = item.count;
     return counts;
   }, {});
 }
 
 export default async function DashboardPage() {
   let rfps: Rfp[] = [];
-  let documents: RfpDocument[] = [];
-  let comments: RfpComment[] = [];
+  let documentCounts: Record<string, number> = {};
+  let commentCounts: Record<string, number> = {};
   let error: string | null = null;
   let workspaceError: string | null = null;
 
@@ -28,7 +28,9 @@ export default async function DashboardPage() {
   }
 
   try {
-    [documents, comments] = await Promise.all([listDocuments(), listComments()]);
+    const [documentCountRows, commentCountRows] = await Promise.all([listDocumentCountsByRfp(), listCommentCountsByRfp()]);
+    documentCounts = mapCountsByRfpId(documentCountRows);
+    commentCounts = mapCountsByRfpId(commentCountRows);
   } catch (loadError) {
     workspaceError = loadError instanceof Error ? loadError.message : "Could not load RFP workspace counts.";
   }
@@ -46,7 +48,7 @@ export default async function DashboardPage() {
       </section>
       {error ? <div className="notice error">{error}</div> : null}
       {workspaceError ? <div className="notice error">{workspaceError}</div> : null}
-      <RFPTable commentCounts={countByRfpId(comments)} documentCounts={countByRfpId(documents)} rfps={rfps} />
+      <RFPTable commentCounts={commentCounts} documentCounts={documentCounts} rfps={rfps} />
     </div>
   );
 }

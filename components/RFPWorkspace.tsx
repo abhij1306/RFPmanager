@@ -52,8 +52,16 @@ export function RFPWorkspace({
   }
 
   async function removeComment(id: string) {
-    await deleteComment(id);
-    setCommentList((current) => current.filter((comment) => comment.id !== id));
+    setMessage(null);
+    setMessageType("info");
+
+    try {
+      await deleteComment(id);
+      setCommentList((current) => current.filter((comment) => comment.id !== id));
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not delete comment.");
+    }
   }
 
   async function removeDocument(id: string) {
@@ -61,10 +69,18 @@ export function RFPWorkspace({
       return;
     }
 
-    await deleteDocument(id);
-    setDocumentList((current) => current.filter((document) => document.id !== id));
-    if (activeDocument?.id === id) {
-      setActiveDocument(null);
+    setMessage(null);
+    setMessageType("info");
+
+    try {
+      await deleteDocument(id);
+      setDocumentList((current) => current.filter((document) => document.id !== id));
+      if (activeDocument?.id === id) {
+        setActiveDocument(null);
+      }
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not delete saved markdown.");
     }
   }
 

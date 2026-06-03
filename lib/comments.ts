@@ -1,53 +1,17 @@
-import { getSupabase } from "@/lib/supabase";
+import { createTableHelpers, listCountsByRfp, type RfpCount } from "@/lib/table-helpers";
 import type { RfpComment, RfpCommentInput } from "@/lib/types";
 
 const selectFields = "id, rfp_id, author_name, body, created_at";
+const helpers = createTableHelpers<RfpComment, RfpCommentInput>("rfp_comments", selectFields);
 
-export async function listComments(): Promise<RfpComment[]> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("rfp_comments")
-    .select(selectFields)
-    .order("created_at", { ascending: false });
+export const listComments = helpers.list;
 
-  if (error) {
-    throw error;
-  }
+export const listCommentsByRfp = helpers.listByRfp;
 
-  return data ?? [];
-}
+export const createComment = helpers.create;
 
-export async function listCommentsByRfp(rfpId: string): Promise<RfpComment[]> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("rfp_comments")
-    .select(selectFields)
-    .eq("rfp_id", rfpId)
-    .order("created_at", { ascending: false });
+export const deleteComment = helpers.remove;
 
-  if (error) {
-    throw error;
-  }
-
-  return data ?? [];
-}
-
-export async function createComment(input: RfpCommentInput): Promise<RfpComment> {
-  const supabase = getSupabase();
-  const { data, error } = await supabase.from("rfp_comments").insert(input).select(selectFields).single();
-
-  if (error) {
-    throw error;
-  }
-
-  return data;
-}
-
-export async function deleteComment(id: string): Promise<void> {
-  const supabase = getSupabase();
-  const { error } = await supabase.from("rfp_comments").delete().eq("id", id);
-
-  if (error) {
-    throw error;
-  }
+export function listCommentCountsByRfp(): Promise<RfpCount[]> {
+  return listCountsByRfp("list_comment_counts_by_rfp");
 }
