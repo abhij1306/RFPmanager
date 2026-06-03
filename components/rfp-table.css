@@ -43,6 +43,10 @@ table {
   width: 76px;
 }
 
+.comments-column {
+  width: 96px;
+}
+
 .action-column {
   width: 48px;
 }
@@ -86,7 +90,7 @@ tbody tr:hover {
 
 .row-link {
   color: var(--text);
-  font-weight: 750;
+  font-weight: 400;
 }
 
 .truncate-link {
@@ -184,6 +188,12 @@ tbody tr:hover {
 .icon-danger-button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.action-cell {
+  padding: 0 8px;
+  overflow: visible;
+  text-overflow: clip;
 }
 
 .empty {

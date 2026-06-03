@@ -96,7 +96,7 @@ export function RFPTable({
             <col className="code-column" />
             <col className="links-column" />
             <col className="stage-column" />
-            <col className="count-column" />
+            <col className="comments-column" />
             <col className="count-column" />
             <col className="action-column" />
           </colgroup>
@@ -155,7 +155,7 @@ export function RFPTable({
                       {documentCounts[rfp.id] ?? 0}
                     </Link>
                   </td>
-                  <td>
+                  <td className="action-cell">
                     <button
                       aria-label={`Delete ${rfp.client_name}`}
                       className="icon-danger-button"
