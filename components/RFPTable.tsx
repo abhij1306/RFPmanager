@@ -89,6 +89,17 @@ export function RFPTable({
 
       <div className="panel table-wrap">
         <table>
+          <colgroup>
+            <col className="client-column" />
+            <col className="status-column" />
+            <col className="date-column" />
+            <col className="code-column" />
+            <col className="links-column" />
+            <col className="stage-column" />
+            <col className="count-column" />
+            <col className="count-column" />
+            <col className="action-column" />
+          </colgroup>
           <thead>
             <tr>
               <th>Client Name</th>
@@ -108,8 +119,8 @@ export function RFPTable({
 
               return (
                 <tr key={rfp.id}>
-                  <td>
-                    <Link className="row-link" href={`/rfp/${rfp.id}`}>
+                  <td className="client-cell">
+                    <Link className="row-link truncate-link" href={`/rfp/${rfp.id}`} title={rfp.client_name}>
                       {rfp.client_name}
                     </Link>
                   </td>
@@ -141,7 +152,7 @@ export function RFPTable({
                   </td>
                   <td>
                     <Link className="count-link" href={`/rfp/${rfp.id}`}>
-                      {(documentCounts[rfp.id] ?? 0) + rfp.document_links.length}
+                      {documentCounts[rfp.id] ?? 0}
                     </Link>
                   </td>
                   <td>

@@ -69,7 +69,7 @@ export function RFPWorkspace({
   }
 
   async function generateSummary() {
-    const markdown = activeDocument?.markdown ?? documentList.map((document) => `# ${document.title}\n\n${document.markdown}`).join("\n\n");
+    const markdown = documentList.map((document) => `# ${document.title}\n\n${document.markdown}`).join("\n\n");
 
     if (!markdown.trim()) {
       setMessageType("error");

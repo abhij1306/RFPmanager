@@ -110,9 +110,9 @@ async function convertSpreadsheet(file: File, extension: "xlsx" | "csv"): Promis
     return sheetRowsToMarkdown(file.name.replace(/\.[^.]+$/, "") || "CSV", parseCsv(await file.text()));
   }
 
-  const { readSheet } = await import("read-excel-file/browser");
-  const rows = await readSheet(file);
-  return sheetRowsToMarkdown("Sheet 1", rows);
+  const { default: readXlsxFile } = await import("read-excel-file/browser");
+  const sheets = await readXlsxFile(file);
+  return sheets.map(({ sheet, data }) => sheetRowsToMarkdown(sheet, data)).join("\n\n");
 }
 
 async function convertFile(file: File): Promise<ConversionResult> {

@@ -9,10 +9,42 @@
 
 table {
   width: 100%;
-  min-width: 1040px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 13px;
+  table-layout: fixed;
+}
+
+.client-column {
+  width: min(24%, 280px);
+}
+
+.status-column {
+  width: 82px;
+}
+
+.date-column {
+  width: 118px;
+}
+
+.code-column {
+  width: 130px;
+}
+
+.links-column {
+  width: 100px;
+}
+
+.stage-column {
+  width: 120px;
+}
+
+.count-column {
+  width: 76px;
+}
+
+.action-column {
+  width: 48px;
 }
 
 th,
@@ -24,6 +56,8 @@ td {
   text-align: left;
   vertical-align: middle;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 th:last-child,
@@ -53,6 +87,13 @@ tbody tr:hover {
 .row-link {
   color: var(--text);
   font-weight: 750;
+}
+
+.truncate-link {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .row-link:hover,
