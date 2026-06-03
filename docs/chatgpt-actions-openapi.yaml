@@ -1,32 +1,42 @@
 openapi: 3.1.0
 info:
   title: RFPmanager ChatGPT Actions
-  version: 0.1.0
-  description: Actions for reading and updating RFPmanager opportunities from ChatGPT.
+  version: 0.2.0
+  description: API for listing, creating, reading, and updating RFPmanager opportunities.
+
 servers:
-  - url: https://YOUR-VERCEL-DOMAIN.example.com
+  - url: https://rfpmanager.vercel.app
+
 security:
   - chatgptActionsApiKey: []
+
 paths:
   /api/chatgpt/rfps:
     get:
       operationId: listRfps
-      summary: List RFP opportunities
+      summary: List all RFP opportunities
+      description: >
+        Use this operation for requests like "show all RFPs", "list RFPs",
+        "pipeline", "opportunities", "active RFPs", "upcoming deadlines",
+        or when searching by client name or tender code.
       responses:
         "200":
-          description: RFP list
+          description: List of RFP opportunities.
           content:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
                 properties:
                   rfps:
                     type: array
                     items:
                       $ref: "#/components/schemas/Rfp"
+
     post:
       operationId: createRfp
-      summary: Create an RFP opportunity
+      summary: Create a new RFP opportunity
+      description: Use this only when the user wants to add or create a new RFP record.
       requestBody:
         required: true
         content:
@@ -35,43 +45,57 @@ paths:
               $ref: "#/components/schemas/RfpInput"
       responses:
         "201":
-          description: Created RFP
+          description: Created RFP.
           content:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
                 properties:
                   rfp:
                     $ref: "#/components/schemas/Rfp"
+
   /api/chatgpt/rfps/{id}:
     get:
       operationId: getRfp
-      summary: Get one RFP opportunity
+      summary: Get one RFP opportunity by UUID
+      description: >
+        Use this only when the user provides a specific RFP UUID.
+        Do not use this operation for "all RFPs" or general list requests.
       parameters:
         - name: id
           in: path
           required: true
+          description: The UUID of the RFP record.
           schema:
             type: string
+            format: uuid
       responses:
         "200":
-          description: RFP details
+          description: RFP details.
           content:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
                 properties:
                   rfp:
                     $ref: "#/components/schemas/Rfp"
+
     patch:
       operationId: updateRfp
-      summary: Update an RFP opportunity
+      summary: Update one RFP opportunity by UUID
+      description: >
+        Use this only when updating an existing RFP and the correct RFP UUID is known.
+        If only a client name or tender code is given, call listRfps first to find the record.
       parameters:
         - name: id
           in: path
           required: true
+          description: The UUID of the RFP record to update.
           schema:
             type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -80,118 +104,403 @@ paths:
               $ref: "#/components/schemas/RfpUpdate"
       responses:
         "200":
-          description: Updated RFP
+          description: Updated RFP.
           content:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
                 properties:
                   rfp:
                     $ref: "#/components/schemas/Rfp"
+
+  /api/chatgpt/rfps/{id}/documents:
+    get:
+      operationId: listRfpDocuments
+      summary: List saved source documents and Markdown for one RFP
+      description: Use this before adding summaries or responses when the GPT needs to inspect saved tender source files and converted Markdown.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The UUID of the RFP record.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Saved Markdown documents and original source files.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  documents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RfpDocument"
+                  source_files:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RfpFileWithDownload"
+
+  /api/chatgpt/rfps/{id}/documents/convert:
+    post:
+      operationId: convertAndSaveRfpDocuments
+      summary: Upload source files, convert them to Markdown, and save them to one RFP
+      description: >
+        Use this when a user provides tender source documents in ChatGPT and wants them saved in RFPmanager.
+        The request must include openaiFileIdRefs; ChatGPT will populate each item with a temporary download_link.
+      x-openai-isConsequential: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The UUID of the RFP record.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenAiFileUploadRequest"
+      responses:
+        "201":
+          description: Saved source files and converted Markdown documents.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  saved:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      properties:
+                        document:
+                          $ref: "#/components/schemas/RfpDocument"
+                        source_file:
+                          $ref: "#/components/schemas/RfpFile"
+
+  /api/chatgpt/rfps/{id}/summary:
+    post:
+      operationId: saveRfpSummary
+      summary: Save a GPT-created summary for one RFP
+      description: Use this after the GPT has reviewed saved Markdown and produced a summary. This does not call Groq.
+      x-openai-isConsequential: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The UUID of the RFP record.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - summary
+              properties:
+                summary:
+                  type: string
+                  description: The complete summary text to save against the RFP.
+      responses:
+        "200":
+          description: Updated RFP with saved summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  rfp:
+                    $ref: "#/components/schemas/Rfp"
+                  summary:
+                    type: ["string", "null"]
+
+  /api/chatgpt/rfps/{id}/responses:
+    get:
+      operationId: listRfpResponses
+      summary: List response files for one RFP
+      description: Use this to check whether proposal response files have already been saved for an RFP.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The UUID of the RFP record.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Saved response files.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  responses:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RfpFileWithDownload"
+
+    post:
+      operationId: saveRfpResponses
+      summary: Upload GPT-created response files for one RFP
+      description: >
+        Use this after the GPT creates response files such as PDF, DOCX, or XLSX outputs.
+        The request must include openaiFileIdRefs; ChatGPT will populate each item with a temporary download_link.
+      x-openai-isConsequential: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The UUID of the RFP record.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OpenAiFileUploadRequest"
+      responses:
+        "201":
+          description: Saved response files.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  responses:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RfpFile"
+
 components:
   securitySchemes:
     chatgptActionsApiKey:
       type: http
       scheme: bearer
-      description: Shared API key stored as CHATGPT_ACTIONS_API_KEY in RFPmanager and configured in the GPT Action.
+      description: Shared API key sent as a bearer token in the Authorization header.
+
   schemas:
     Rfp:
       type: object
+      additionalProperties: false
       properties:
         id:
           type: string
+          format: uuid
         client_name:
           type: string
         status:
           type: string
-          enum: [Yes, No, TBD]
+          enum: ["Yes", "No", "TBD"]
         closing_date:
-          type: [string, "null"]
+          type: ["string", "null"]
+          description: ISO date in YYYY-MM-DD format, if available.
         tender_code:
-          type: [string, "null"]
+          type: ["string", "null"]
         tender_link:
-          type: [string, "null"]
+          type: ["string", "null"]
         gdrive_link:
-          type: [string, "null"]
+          type: ["string", "null"]
         description:
-          type: [string, "null"]
+          type: ["string", "null"]
         contact_person:
-          type: [string, "null"]
+          type: ["string", "null"]
         contact_phone:
-          type: [string, "null"]
+          type: ["string", "null"]
         contact_email:
-          type: [string, "null"]
+          type: ["string", "null"]
+        document_links:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            properties:
+              name:
+                type: string
+              url:
+                type: string
+        summary_generated_at:
+          type: ["string", "null"]
         summary:
-          type: [string, "null"]
+          type: ["string", "null"]
         notes:
-          type: [string, "null"]
+          type: ["string", "null"]
         pipeline_stage:
           type: string
-          enum: [Prospects, Active, Submitted, Won, Lost]
+          enum: ["Prospects", "Active", "Submitted", "Won", "Lost"]
         created_at:
           type: string
+
+    OpenAiFileUploadRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - openaiFileIdRefs
+      properties:
+        openaiFileIdRefs:
+          type: array
+          description: >
+            One to ten files from the ChatGPT conversation. The parameter name must be openaiFileIdRefs.
+            At runtime ChatGPT populates each item with id, name, mime_type, and a temporary download_link.
+          minItems: 1
+          maxItems: 10
+          items:
+            type: string
+
+    RfpDocument:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        rfp_id:
+          type: string
+          format: uuid
+        source_file_id:
+          type: ["string", "null"]
+          format: uuid
+        title:
+          type: string
+        source_filename:
+          type: ["string", "null"]
+        source_type:
+          type: string
+          enum: ["docx", "pdf", "xlsx", "csv", "markdown"]
+        markdown:
+          type: string
+        created_at:
+          type: string
+
+    RfpFile:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        rfp_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: ["source", "response"]
+        title:
+          type: string
+        original_filename:
+          type: string
+        mime_type:
+          type: ["string", "null"]
+        storage_path:
+          type: string
+        file_size_bytes:
+          type: ["integer", "null"]
+        status:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        created_by:
+          type: string
+        created_at:
+          type: string
+        download_url:
+          type: string
+          format: uri
+
+    RfpFileWithDownload:
+      allOf:
+        - $ref: "#/components/schemas/RfpFile"
+        - type: object
+          additionalProperties: false
+          properties:
+            download_url:
+              type: string
+              format: uri
+
     RfpInput:
       type: object
-      required: [client_name]
+      additionalProperties: false
+      required:
+        - client_name
       properties:
         client_name:
           type: string
         status:
           type: string
-          enum: [Yes, No, TBD]
-          default: TBD
+          enum: ["Yes", "No", "TBD"]
+          default: "TBD"
         closing_date:
-          type: [string, "null"]
+          type: ["string", "null"]
           description: ISO date in YYYY-MM-DD format.
         closing_date_text:
-          type: [string, "null"]
+          type: ["string", "null"]
           description: Human-readable closing date if an ISO date is not available.
         tender_code:
-          type: [string, "null"]
+          type: ["string", "null"]
         tender_link:
-          type: [string, "null"]
+          type: ["string", "null"]
         gdrive_link:
-          type: [string, "null"]
+          type: ["string", "null"]
         description:
-          type: [string, "null"]
+          type: ["string", "null"]
         contact_person:
-          type: [string, "null"]
+          type: ["string", "null"]
         contact_phone:
-          type: [string, "null"]
+          type: ["string", "null"]
         contact_email:
-          type: [string, "null"]
+          type: ["string", "null"]
         notes:
-          type: [string, "null"]
+          type: ["string", "null"]
         pipeline_stage:
           type: string
-          enum: [Prospects, Active, Submitted, Won, Lost]
-          default: Prospects
+          enum: ["Prospects", "Active", "Submitted", "Won", "Lost"]
+          default: "Prospects"
+
     RfpUpdate:
       type: object
+      additionalProperties: false
       properties:
         client_name:
           type: string
         status:
           type: string
-          enum: [Yes, No, TBD]
+          enum: ["Yes", "No", "TBD"]
         closing_date:
-          type: [string, "null"]
+          type: ["string", "null"]
         tender_code:
-          type: [string, "null"]
+          type: ["string", "null"]
         tender_link:
-          type: [string, "null"]
+          type: ["string", "null"]
         gdrive_link:
-          type: [string, "null"]
+          type: ["string", "null"]
         description:
-          type: [string, "null"]
+          type: ["string", "null"]
         contact_person:
-          type: [string, "null"]
+          type: ["string", "null"]
         contact_phone:
-          type: [string, "null"]
+          type: ["string", "null"]
         contact_email:
-          type: [string, "null"]
+          type: ["string", "null"]
         notes:
-          type: [string, "null"]
+          type: ["string", "null"]
         pipeline_stage:
           type: string
-          enum: [Prospects, Active, Submitted, Won, Lost]
+          enum: ["Prospects", "Active", "Submitted", "Won", "Lost"]

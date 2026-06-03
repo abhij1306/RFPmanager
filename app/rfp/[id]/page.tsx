@@ -3,8 +3,9 @@ import { RFPForm } from "@/components/RFPForm";
 import { RFPWorkspace } from "@/components/RFPWorkspace";
 import { listCommentsByRfp } from "@/lib/comments";
 import { listDocumentsByRfp } from "@/lib/documents";
+import { listFilesByRfp } from "@/lib/rfp-files";
 import { getRfp } from "@/lib/rfps";
-import type { RfpComment, RfpDocument } from "@/lib/types";
+import type { RfpComment, RfpDocument, RfpFile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -17,11 +18,12 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
   }
 
   let documents: RfpDocument[] = [];
+  let files: RfpFile[] = [];
   let comments: RfpComment[] = [];
   let workspaceError: string | null = null;
 
   try {
-    [documents, comments] = await Promise.all([listDocumentsByRfp(id), listCommentsByRfp(id)]);
+    [documents, files, comments] = await Promise.all([listDocumentsByRfp(id), listFilesByRfp(id), listCommentsByRfp(id)]);
   } catch (loadError) {
     workspaceError = loadError instanceof Error ? loadError.message : "Could not load RFP workspace.";
   }
@@ -37,7 +39,7 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
       {workspaceError ? <div className="notice error">{workspaceError}</div> : null}
       <div className="detail-layout">
         <RFPForm rfp={rfp} />
-        <RFPWorkspace comments={comments} documents={documents} rfp={rfp} />
+        <RFPWorkspace comments={comments} documents={documents} files={files} rfp={rfp} />
       </div>
     </div>
   );

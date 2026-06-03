@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { convertFile } from "@/lib/document-conversion";
 import { createDocument, deleteDocument } from "@/lib/documents";
+import { uploadRfpFile } from "@/lib/rfp-files";
 import type { Rfp, RfpDocument, RfpDocumentSourceType } from "@/lib/types";
 import "./doc-converter.css";
 
@@ -14,6 +15,7 @@ export function DocConverter({ documents, rfps }: { documents: RfpDocument[]; rf
   const [savedDocuments, setSavedDocuments] = useState(documents);
   const [markdown, setMarkdown] = useState("");
   const [fileName, setFileName] = useState("");
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [sourceType, setSourceType] = useState<RfpDocumentSourceType>("markdown");
   const [selectedRfpId, setSelectedRfpId] = useState(rfps[0]?.id ?? "");
   const [title, setTitle] = useState("");
@@ -33,6 +35,7 @@ export function DocConverter({ documents, rfps }: { documents: RfpDocument[]; rf
     setMessage(null);
     setIsConverting(true);
     setFileName(file.name);
+    setSourceFile(file);
     setTitle(file.name.replace(/\.[^.]+$/, ""));
 
     try {
@@ -42,6 +45,7 @@ export function DocConverter({ documents, rfps }: { documents: RfpDocument[]; rf
       setMessage("Converted locally in your browser.");
     } catch (error) {
       setMarkdown("");
+      setSourceFile(null);
       setMessage(error instanceof Error ? error.message : "Could not convert this file.");
     } finally {
       setIsConverting(false);
@@ -67,14 +71,31 @@ export function DocConverter({ documents, rfps }: { documents: RfpDocument[]; rf
     setMessage(null);
 
     try {
+      let sourceFileId: string | null = null;
+
+      if (sourceFile) {
+        const savedSourceFile = await uploadRfpFile({
+          body: sourceFile,
+          kind: "source",
+          mimeType: sourceFile.type || null,
+          originalFilename: sourceFile.name,
+          rfpId: selectedRfpId,
+          status: "Converted",
+          title: title.trim() || fileName || sourceFile.name,
+        });
+        sourceFileId = savedSourceFile.id;
+      }
+
       const saved = await createDocument({
         rfp_id: selectedRfpId,
+        source_file_id: sourceFileId,
         title: title.trim() || fileName || "Converted markdown",
         source_filename: fileName || null,
         source_type: sourceType,
         markdown,
       });
       setSavedDocuments((current) => [saved, ...current]);
+      setSourceFile(null);
       setMessage("Markdown saved to the selected RFP.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not save this markdown.");
@@ -102,6 +123,7 @@ export function DocConverter({ documents, rfps }: { documents: RfpDocument[]; rf
     setSourceType(document.source_type);
     setTitle(document.title);
     setFileName(document.source_filename ?? "");
+    setSourceFile(null);
     setSelectedRfpId(document.rfp_id);
     setMessage(null);
   }

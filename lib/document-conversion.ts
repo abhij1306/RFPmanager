@@ -1,4 +1,5 @@
 import TurndownService from "turndown";
+import { getAllowedFileSourceType } from "@/lib/chatgpt-files";
 import type { RfpDocumentSourceType } from "@/lib/types";
 
 export type ConversionResult = {
@@ -13,7 +14,7 @@ function markdownEscape(value: unknown): string {
     .trim();
 }
 
-function sheetRowsToMarkdown(sheetName: string, rows: unknown[][]): string {
+export function sheetRowsToMarkdown(sheetName: string, rows: unknown[][]): string {
   const populatedRows = rows
     .map((row) => row.map(markdownEscape))
     .filter((row) => row.some((cell) => cell.length > 0));
@@ -38,7 +39,7 @@ function sheetRowsToMarkdown(sheetName: string, rows: unknown[][]): string {
   ].join("\n");
 }
 
-function parseCsv(text: string): string[][] {
+export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -75,11 +76,15 @@ function parseCsv(text: string): string[][] {
   return rows;
 }
 
+function htmlToMarkdown(html: string): string {
+  return new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" }).turndown(html);
+}
+
 async function convertDocx(file: File): Promise<string> {
   const mammoth = await import("mammoth/mammoth.browser");
   const arrayBuffer = await file.arrayBuffer();
   const result = await mammoth.convertToHtml({ arrayBuffer });
-  return new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" }).turndown(result.value);
+  return htmlToMarkdown(result.value);
 }
 
 async function convertPdf(file: File): Promise<string> {
@@ -111,26 +116,22 @@ async function convertSpreadsheet(file: File, extension: "xlsx" | "csv"): Promis
 }
 
 export async function convertFile(file: File): Promise<ConversionResult> {
-  const extension = file.name.split(".").pop()?.toLowerCase();
+  const sourceType = getAllowedFileSourceType(file.name);
 
-  if (extension === "docx") {
-    return { markdown: await convertDocx(file), sourceType: extension };
+  if (sourceType === "docx") {
+    return { markdown: await convertDocx(file), sourceType };
   }
 
-  if (extension === "pdf") {
-    return { markdown: await convertPdf(file), sourceType: extension };
+  if (sourceType === "pdf") {
+    return { markdown: await convertPdf(file), sourceType };
   }
 
-  if (extension === "xlsx" || extension === "csv") {
-    return { markdown: await convertSpreadsheet(file, extension), sourceType: extension };
+  if (sourceType === "xlsx" || sourceType === "csv") {
+    return { markdown: await convertSpreadsheet(file, sourceType), sourceType };
   }
 
-  if (extension === "md" || extension === "markdown" || extension === "txt") {
+  if (sourceType === "markdown") {
     return { markdown: await file.text(), sourceType: "markdown" };
-  }
-
-  if (extension === "xls") {
-    throw new Error("Legacy XLS files are not supported. Save the spreadsheet as XLSX or CSV first.");
   }
 
   throw new Error("Upload a DOCX, PDF, XLSX, CSV, MD, Markdown, or TXT file.");

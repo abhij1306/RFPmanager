@@ -252,6 +252,10 @@ nav a:hover {
   resize: vertical;
 }
 
+.compact-textarea {
+  min-height: 68px;
+}
+
 .input:focus,
 .select:focus,
 .textarea:focus {

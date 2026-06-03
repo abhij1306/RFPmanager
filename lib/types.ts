@@ -50,10 +50,12 @@ export type RfpImportInput = Partial<RfpInput> & {
 };
 
 export type RfpDocumentSourceType = "docx" | "pdf" | "xlsx" | "csv" | "markdown";
+export type RfpFileKind = "source" | "response";
 
 export type RfpDocument = {
   id: string;
   rfp_id: string;
+  source_file_id: string | null;
   title: string;
   source_filename: string | null;
   source_type: RfpDocumentSourceType;
@@ -63,10 +65,39 @@ export type RfpDocument = {
 
 export type RfpDocumentInput = {
   rfp_id: string;
+  source_file_id?: string | null;
   title: string;
   source_filename: string | null;
   source_type: RfpDocumentSourceType;
   markdown: string;
+};
+
+export type RfpFile = {
+  id: string;
+  rfp_id: string;
+  kind: RfpFileKind;
+  title: string;
+  original_filename: string;
+  mime_type: string | null;
+  storage_path: string;
+  file_size_bytes: number | null;
+  status: string | null;
+  notes: string | null;
+  created_by: string;
+  created_at: string;
+};
+
+export type RfpFileInput = {
+  rfp_id: string;
+  kind: RfpFileKind;
+  title: string;
+  original_filename: string;
+  mime_type: string | null;
+  storage_path: string;
+  file_size_bytes: number | null;
+  status?: string | null;
+  notes?: string | null;
+  created_by?: string;
 };
 
 export type RfpComment = {

@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 import { createComment, deleteComment } from "@/lib/comments";
 import { convertFile } from "@/lib/document-conversion";
 import { createDocument, deleteDocument } from "@/lib/documents";
-import type { Rfp, RfpComment, RfpDocument, RfpDocumentSourceType } from "@/lib/types";
+import { createRfpFileDownloadUrl, deleteRfpFile, uploadRfpFile } from "@/lib/rfp-files";
+import type { Rfp, RfpComment, RfpDocument, RfpDocumentSourceType, RfpFile } from "@/lib/types";
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
@@ -17,14 +18,17 @@ function combineDocumentMarkdown(documents: RfpDocument[]): string {
 export function RFPWorkspace({
   comments,
   documents,
+  files,
   rfp,
 }: {
   comments: RfpComment[];
   documents: RfpDocument[];
+  files: RfpFile[];
   rfp: Rfp;
 }) {
   const [commentList, setCommentList] = useState(comments);
   const [documentList, setDocumentList] = useState(documents);
+  const [fileList, setFileList] = useState(files);
   const [commentBody, setCommentBody] = useState("");
   const [activeDocument, setActiveDocument] = useState<RfpDocument | null>(documents[0] ?? null);
   const [summary, setSummary] = useState(rfp.summary ?? "");
@@ -32,14 +36,20 @@ export function RFPWorkspace({
   const [markdownDraft, setMarkdownDraft] = useState("");
   const [markdownTitle, setMarkdownTitle] = useState("");
   const [sourceFileName, setSourceFileName] = useState("");
+  const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [sourceType, setSourceType] = useState<RfpDocumentSourceType>("markdown");
+  const [responseNotes, setResponseNotes] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"info" | "error">("info");
   const [isConverting, setIsConverting] = useState(false);
   const [isSavingMarkdown, setIsSavingMarkdown] = useState(false);
+  const [isUploadingResponse, setIsUploadingResponse] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const sourceInputRef = useRef<HTMLInputElement>(null);
+  const responseInputRef = useRef<HTMLInputElement>(null);
+  const sourceFiles = fileList.filter((file) => file.kind === "source");
+  const responseFiles = fileList.filter((file) => file.kind === "response");
 
   async function handleFiles(files: FileList | null) {
     const file = files?.[0];
@@ -51,6 +61,7 @@ export function RFPWorkspace({
     setMessage(null);
     setMessageType("info");
     setSourceFileName(file.name);
+    setSourceFile(file);
     setMarkdownTitle(file.name.replace(/\.[^.]+$/, ""));
 
     try {
@@ -60,6 +71,7 @@ export function RFPWorkspace({
       setMessage("Markdown is ready to review and save.");
     } catch (error) {
       setMarkdownDraft("");
+      setSourceFile(null);
       setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not convert this file.");
     } finally {
@@ -122,6 +134,72 @@ export function RFPWorkspace({
     }
   }
 
+  async function downloadFile(file: RfpFile) {
+    setMessage(null);
+    setMessageType("info");
+
+    try {
+      const url = await createRfpFileDownloadUrl(file);
+      window.open(url, "_blank", "noopener,noreferrer");
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not create a download link.");
+    }
+  }
+
+  async function removeFile(file: RfpFile) {
+    if (!window.confirm(`Delete ${file.original_filename}?`)) {
+      return;
+    }
+
+    setMessage(null);
+    setMessageType("info");
+
+    try {
+      await deleteRfpFile(file);
+      setFileList((current) => current.filter((item) => item.id !== file.id));
+      setMessage("File deleted.");
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not delete file.");
+    }
+  }
+
+  async function uploadResponse(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setIsUploadingResponse(true);
+    setMessage(null);
+    setMessageType("info");
+
+    try {
+      const saved = await uploadRfpFile({
+        body: file,
+        kind: "response",
+        mimeType: file.type || null,
+        notes: responseNotes.trim() || null,
+        originalFilename: file.name,
+        rfpId: rfp.id,
+        status: "Draft",
+        title: file.name.replace(/\.[^.]+$/, "") || file.name,
+      });
+      setFileList((current) => [saved, ...current]);
+      setResponseNotes("");
+      setMessage("Response file saved.");
+      if (responseInputRef.current) {
+        responseInputRef.current.value = "";
+      }
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not save response file.");
+    } finally {
+      setIsUploadingResponse(false);
+    }
+  }
+
   async function generateSummary(documentsToSummarize = documentList) {
     const markdown = combineDocumentMarkdown(documentsToSummarize);
 
@@ -173,8 +251,25 @@ export function RFPWorkspace({
     setMessageType("info");
 
     try {
+      let sourceFileId: string | null = null;
+
+      if (sourceFile) {
+        const savedSourceFile = await uploadRfpFile({
+          body: sourceFile,
+          kind: "source",
+          mimeType: sourceFile.type || null,
+          originalFilename: sourceFile.name,
+          rfpId: rfp.id,
+          status: generateAfterSave ? "Converted and summarized" : "Converted",
+          title: markdownTitle.trim() || sourceFileName || sourceFile.name,
+        });
+        sourceFileId = savedSourceFile.id;
+        setFileList((current) => [savedSourceFile, ...current]);
+      }
+
       const saved = await createDocument({
         rfp_id: rfp.id,
+        source_file_id: sourceFileId,
         title: markdownTitle.trim() || sourceFileName || "Saved markdown",
         source_filename: sourceFileName || null,
         source_type: sourceType,
@@ -186,7 +281,11 @@ export function RFPWorkspace({
       setMarkdownDraft("");
       setMarkdownTitle("");
       setSourceFileName("");
+      setSourceFile(null);
       setSourceType("markdown");
+      if (sourceInputRef.current) {
+        sourceInputRef.current.value = "";
+      }
       setMessage(generateAfterSave ? "Markdown saved. Generating summary..." : "Markdown saved to this RFP.");
 
       if (generateAfterSave) {
@@ -223,7 +322,7 @@ export function RFPWorkspace({
             <h2>Add Markdown</h2>
             <p>{sourceFileName || "Upload a source file or paste markdown for this RFP"}</p>
           </div>
-          <button className="ghost-button compact-button" onClick={() => inputRef.current?.click()} type="button">
+          <button className="ghost-button compact-button" onClick={() => sourceInputRef.current?.click()} type="button">
             {isConverting ? "Converting..." : "Upload"}
           </button>
         </div>
@@ -231,7 +330,7 @@ export function RFPWorkspace({
           accept=".docx,.pdf,.xlsx,.csv,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain"
           hidden
           onChange={(event) => void handleFiles(event.target.files)}
-          ref={inputRef}
+          ref={sourceInputRef}
           type="file"
         />
         <input
@@ -268,6 +367,80 @@ export function RFPWorkspace({
           >
             Save & Generate
           </button>
+        </div>
+      </section>
+
+      <section className="workspace-section">
+        <div className="section-heading">
+          <div>
+            <h2>Source Documents</h2>
+            <p>{sourceFiles.length} original files saved</p>
+          </div>
+        </div>
+        <div className="document-list compact-list">
+          {sourceFiles.map((file) => (
+            <article className="document-row" key={file.id}>
+              <div className="file-icon">SRC</div>
+              <span className="document-main">
+                <span className="document-title">{file.title}</span>
+                <span className="document-meta">
+                  {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
+                </span>
+              </span>
+              <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
+                Download
+              </button>
+              <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
+                Delete
+              </button>
+            </article>
+          ))}
+          {sourceFiles.length === 0 ? <div className="empty-library">Original uploaded documents will appear here.</div> : null}
+        </div>
+      </section>
+
+      <section className="workspace-section">
+        <div className="section-heading">
+          <div>
+            <h2>Responses</h2>
+            <p>{responseFiles.length} response files saved</p>
+          </div>
+          <button className="ghost-button compact-button" onClick={() => responseInputRef.current?.click()} type="button">
+            {isUploadingResponse ? "Uploading..." : "Upload"}
+          </button>
+        </div>
+        <input
+          accept=".docx,.pdf,.xlsx,.csv,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain"
+          hidden
+          onChange={(event) => void uploadResponse(event.target.files)}
+          ref={responseInputRef}
+          type="file"
+        />
+        <textarea
+          className="textarea compact-textarea"
+          onChange={(event) => setResponseNotes(event.target.value)}
+          placeholder="Optional response notes"
+          value={responseNotes}
+        />
+        <div className="document-list compact-list">
+          {responseFiles.map((file) => (
+            <article className="document-row" key={file.id}>
+              <div className="file-icon">RSP</div>
+              <span className="document-main">
+                <span className="document-title">{file.title}</span>
+                <span className="document-meta">
+                  {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
+                </span>
+              </span>
+              <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
+                Download
+              </button>
+              <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
+                Delete
+              </button>
+            </article>
+          ))}
+          {responseFiles.length === 0 ? <div className="empty-library">Response files will appear here.</div> : null}
         </div>
       </section>
 
