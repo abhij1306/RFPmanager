@@ -1,12 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createComment, deleteComment } from "@/lib/comments";
-import { deleteDocument } from "@/lib/documents";
-import type { Rfp, RfpComment, RfpDocument } from "@/lib/types";
+import { convertFile } from "@/lib/document-conversion";
+import { createDocument, deleteDocument } from "@/lib/documents";
+import type { Rfp, RfpComment, RfpDocument, RfpDocumentSourceType } from "@/lib/types";
 
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+function combineDocumentMarkdown(documents: RfpDocument[]): string {
+  return documents.map((document) => `# ${document.title}\n\n${document.markdown}`).join("\n\n");
 }
 
 export function RFPWorkspace({
@@ -24,10 +29,43 @@ export function RFPWorkspace({
   const [activeDocument, setActiveDocument] = useState<RfpDocument | null>(documents[0] ?? null);
   const [summary, setSummary] = useState(rfp.summary ?? "");
   const [summaryGeneratedAt, setSummaryGeneratedAt] = useState(rfp.summary_generated_at);
+  const [markdownDraft, setMarkdownDraft] = useState("");
+  const [markdownTitle, setMarkdownTitle] = useState("");
+  const [sourceFileName, setSourceFileName] = useState("");
+  const [sourceType, setSourceType] = useState<RfpDocumentSourceType>("markdown");
   const [message, setMessage] = useState<string | null>(null);
   const [messageType, setMessageType] = useState<"info" | "error">("info");
+  const [isConverting, setIsConverting] = useState(false);
+  const [isSavingMarkdown, setIsSavingMarkdown] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFiles(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setIsConverting(true);
+    setMessage(null);
+    setMessageType("info");
+    setSourceFileName(file.name);
+    setMarkdownTitle(file.name.replace(/\.[^.]+$/, ""));
+
+    try {
+      const result = await convertFile(file);
+      setMarkdownDraft(result.markdown);
+      setSourceType(result.sourceType);
+      setMessage("Markdown is ready to review and save.");
+    } catch (error) {
+      setMarkdownDraft("");
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not convert this file.");
+    } finally {
+      setIsConverting(false);
+    }
+  }
 
   async function addComment() {
     const body = commentBody.trim();
@@ -84,8 +122,8 @@ export function RFPWorkspace({
     }
   }
 
-  async function generateSummary() {
-    const markdown = documentList.map((document) => `# ${document.title}\n\n${document.markdown}`).join("\n\n");
+  async function generateSummary(documentsToSummarize = documentList) {
+    const markdown = combineDocumentMarkdown(documentsToSummarize);
 
     if (!markdown.trim()) {
       setMessageType("error");
@@ -121,6 +159,47 @@ export function RFPWorkspace({
     }
   }
 
+  async function saveMarkdown(generateAfterSave = false) {
+    const markdown = markdownDraft.trim();
+
+    if (!markdown) {
+      setMessageType("error");
+      setMessage("Add or upload markdown before saving.");
+      return;
+    }
+
+    setIsSavingMarkdown(true);
+    setMessage(null);
+    setMessageType("info");
+
+    try {
+      const saved = await createDocument({
+        rfp_id: rfp.id,
+        title: markdownTitle.trim() || sourceFileName || "Saved markdown",
+        source_filename: sourceFileName || null,
+        source_type: sourceType,
+        markdown,
+      });
+      const nextDocuments = [saved, ...documentList];
+      setDocumentList(nextDocuments);
+      setActiveDocument(saved);
+      setMarkdownDraft("");
+      setMarkdownTitle("");
+      setSourceFileName("");
+      setSourceType("markdown");
+      setMessage(generateAfterSave ? "Markdown saved. Generating summary..." : "Markdown saved to this RFP.");
+
+      if (generateAfterSave) {
+        await generateSummary(nextDocuments);
+      }
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not save markdown.");
+    } finally {
+      setIsSavingMarkdown(false);
+    }
+  }
+
   return (
     <aside className="workspace-panel">
       {message ? <div className={`notice ${messageType === "error" ? "error" : ""}`}>{message}</div> : null}
@@ -136,6 +215,60 @@ export function RFPWorkspace({
           </button>
         </div>
         {summary ? <pre className="markdown-preview document-preview">{summary}</pre> : <div className="empty-library">No summary generated yet.</div>}
+      </section>
+
+      <section className="workspace-section">
+        <div className="section-heading">
+          <div>
+            <h2>Add Markdown</h2>
+            <p>{sourceFileName || "Upload a source file or paste markdown for this RFP"}</p>
+          </div>
+          <button className="ghost-button compact-button" onClick={() => inputRef.current?.click()} type="button">
+            {isConverting ? "Converting..." : "Upload"}
+          </button>
+        </div>
+        <input
+          accept=".docx,.pdf,.xlsx,.csv,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain"
+          hidden
+          onChange={(event) => void handleFiles(event.target.files)}
+          ref={inputRef}
+          type="file"
+        />
+        <input
+          className="input"
+          onChange={(event) => setMarkdownTitle(event.target.value)}
+          placeholder="Markdown title"
+          value={markdownTitle}
+        />
+        <textarea
+          className="textarea markdown-draft"
+          onChange={(event) => {
+            setMarkdownDraft(event.target.value);
+            if (!sourceFileName) {
+              setSourceType("markdown");
+            }
+          }}
+          placeholder="Paste markdown here, or upload DOCX, PDF, XLSX, CSV, MD, Markdown, or TXT."
+          value={markdownDraft}
+        />
+        <div className="form-actions flush-actions">
+          <button
+            className="button"
+            disabled={!markdownDraft.trim() || isSavingMarkdown}
+            onClick={() => void saveMarkdown(false)}
+            type="button"
+          >
+            {isSavingMarkdown ? "Saving..." : "Save Markdown"}
+          </button>
+          <button
+            className="ghost-button"
+            disabled={!markdownDraft.trim() || isSavingMarkdown || isSummarizing}
+            onClick={() => void saveMarkdown(true)}
+            type="button"
+          >
+            Save & Generate
+          </button>
+        </div>
       </section>
 
       <section className="workspace-section">
