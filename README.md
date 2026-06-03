@@ -57,12 +57,12 @@ The schema enables Row Level Security and allows anonymous team access for this 
 
 ## ChatGPT Actions Integration
 
-Use this when you want team members to use a shared Custom GPT, sign in to RFPmanager from ChatGPT, and let ChatGPT read or update RFPs through this app.
+Use this when you want team members to use one shared Custom GPT that can read and update RFPmanager. This setup uses one shared API key. Team members do not need to sign in to RFPmanager from ChatGPT.
 
 ### What You Build Once
 
 - One shared Custom GPT or ChatGPT app for the team.
-- OAuth login for RFPmanager using Supabase Auth.
+- One shared `CHATGPT_ACTIONS_API_KEY` secret.
 - ChatGPT-facing API routes:
   - `GET /api/chatgpt/rfps`
   - `POST /api/chatgpt/rfps`
@@ -70,44 +70,23 @@ Use this when you want team members to use a shared Custom GPT, sign in to RFPma
   - `PATCH /api/chatgpt/rfps/{id}`
 - An OpenAPI Actions schema based on [docs/chatgpt-actions-openapi.yaml](docs/chatgpt-actions-openapi.yaml).
 
-Team members do not create their own GPTs. They use the shared GPT and sign in to RFPmanager when ChatGPT prompts them.
+Team members do not create their own GPTs. They use the shared GPT.
 
-### 1. Enable Supabase Auth
+### 1. Create The Shared API Key
 
-In the Supabase dashboard, enable at least one user sign-in method under **Authentication > Providers**. Recommended options:
+Generate a long random secret and add it to `.env.local` for local development and to Vercel for production:
 
-- Email magic link for the fastest private team setup.
-- Google or Microsoft if your team already uses company accounts.
-
-Add your deployed app URL to the Supabase allowed redirect URLs.
-
-### 2. Enable Supabase OAuth Server
-
-In Supabase, go to **Authentication > OAuth Server** and enable OAuth 2.1 server capabilities.
-
-Supabase exposes these endpoints:
-
-```text
-Authorization URL: https://<project-ref>.supabase.co/auth/v1/oauth/authorize
-Token URL:         https://<project-ref>.supabase.co/auth/v1/oauth/token
-OIDC discovery:   https://<project-ref>.supabase.co/auth/v1/.well-known/openid-configuration
+```bash
+CHATGPT_ACTIONS_API_KEY=replace-with-a-long-random-secret
 ```
 
-If Supabase offers asymmetric JWT signing, use it for OAuth/OIDC. This is especially important when requesting the `openid` scope.
+You can generate one with:
 
-### 3. Register ChatGPT As An OAuth Client
-
-In Supabase OAuth Server settings, create an OAuth client for ChatGPT.
-
-Use the callback URL shown by the GPT Actions authentication screen. OpenAI commonly uses a callback shaped like:
-
-```text
-https://chatgpt.com/aip/<YOUR-GPT-ID>/oauth/callback
+```bash
+node -e "console.log(crypto.randomUUID() + crypto.randomUUID())"
 ```
 
-Save the generated client ID and client secret. You will paste those into the GPT Action authentication settings.
-
-### 4. Configure The Shared GPT Action
+### 2. Configure The Shared GPT Action
 
 In the GPT builder:
 
@@ -115,16 +94,11 @@ In the GPT builder:
 2. Add an Action.
 3. Import [docs/chatgpt-actions-openapi.yaml](docs/chatgpt-actions-openapi.yaml).
 4. Replace `https://YOUR-VERCEL-DOMAIN.example.com` with your deployed app URL.
-5. Replace `YOUR-SUPABASE-PROJECT` in the OAuth URLs with your Supabase project ref.
-6. Set authentication to OAuth.
-7. Use these OAuth values:
-   - Client ID: the Supabase OAuth client ID.
-   - Client secret: the Supabase OAuth client secret.
-   - Authorization URL: `https://<project-ref>.supabase.co/auth/v1/oauth/authorize`
-   - Token URL: `https://<project-ref>.supabase.co/auth/v1/oauth/token`
-   - Scope: `openid rfp:read rfp:write`
+5. Set authentication to **API Key**.
+6. Set the API key value to the same value as `CHATGPT_ACTIONS_API_KEY`.
+7. Send the API key as a bearer token in the `Authorization` header.
 
-### 5. Suggested GPT Instructions
+### 3. Suggested GPT Instructions
 
 Paste this into the GPT instructions and adjust names as needed:
 
@@ -140,17 +114,17 @@ For list requests, prioritize active and upcoming RFPs. For deadline questions, 
 Do not invent RFP records, deadlines, links, contacts, summaries, or bid decisions. If the actions return no data, say that RFPmanager has no matching record.
 ```
 
-### 6. Current Security Note
+### 4. Current Security Note
 
-The ChatGPT routes require a bearer token and pass that token to Supabase. However, the current database schema still allows broad anonymous team access because this app was originally designed as a private shared URL.
+The ChatGPT routes require the shared API key, but the app is still designed as a private shared team tool. Anyone with the deployed app URL and Supabase anon key can use the normal app, and anyone with the ChatGPT Actions API key can call the ChatGPT-facing API routes.
 
-For production-grade per-user permissions, update [supabase/schema.sql](supabase/schema.sql) to:
+Keep these values private:
 
-- Add ownership or workspace membership columns, such as `workspace_id` and `created_by`.
-- Change RLS policies from `to anon using (true)` to authenticated user/workspace checks.
-- Apply the same restrictions to `rfps`, `rfp_documents`, and `rfp_comments`.
+- The deployed app URL.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+- `CHATGPT_ACTIONS_API_KEY`.
 
-Until that is done, ChatGPT sign-in gives you a clean OAuth flow, but it does not isolate one team member's RFP records from another's.
+If you later need per-user access, audit trails, or stronger isolation, replace this shared API key setup with Supabase Auth and OAuth.
 
 ## Vercel Deployment
 
@@ -160,6 +134,7 @@ Until that is done, ChatGPT sign-in gives you a clean OAuth flow, but it does no
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `GROQ_API_KEY`
+   - `CHATGPT_ACTIONS_API_KEY`
 4. Deploy.
 
 ## Tender Import

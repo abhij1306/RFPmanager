@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getBearerToken, unauthorizedResponse } from "@/lib/chatgpt-auth";
-import { getSupabaseWithAccessToken } from "@/lib/supabase";
+import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
+import { getSupabase } from "@/lib/supabase";
 import { normalizeImportedRfp } from "@/lib/rfps";
 import type { Rfp, RfpImportInput } from "@/lib/types";
 
@@ -10,13 +10,13 @@ const selectFields =
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
-  const accessToken = getBearerToken(request);
+  const validation = validateChatgptApiKey(request);
 
-  if (!accessToken) {
-    return unauthorizedResponse();
+  if (!validation.ok) {
+    return chatgptAuthErrorResponse(validation);
   }
 
-  const supabase = getSupabaseWithAccessToken(accessToken);
+  const supabase = getSupabase();
   const { data, error } = await supabase
     .from("rfps")
     .select(selectFields)
@@ -31,10 +31,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const accessToken = getBearerToken(request);
+  const validation = validateChatgptApiKey(request);
 
-  if (!accessToken) {
-    return unauthorizedResponse();
+  if (!validation.ok) {
+    return chatgptAuthErrorResponse(validation);
   }
 
   try {
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "client_name is required." }, { status: 400 });
     }
 
-    const supabase = getSupabaseWithAccessToken(accessToken);
+    const supabase = getSupabase();
     const input = normalizeImportedRfp(payload);
     const { data, error } = await supabase.from("rfps").insert(input).select(selectFields).single<Rfp>();
 

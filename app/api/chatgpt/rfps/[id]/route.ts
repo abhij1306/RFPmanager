@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getBearerToken, unauthorizedResponse } from "@/lib/chatgpt-auth";
-import { getSupabaseWithAccessToken } from "@/lib/supabase";
+import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
+import { getSupabase } from "@/lib/supabase";
 import type { RfpInput } from "@/lib/types";
 
 const selectFields =
@@ -9,14 +9,14 @@ const selectFields =
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const accessToken = getBearerToken(request);
+  const validation = validateChatgptApiKey(request);
 
-  if (!accessToken) {
-    return unauthorizedResponse();
+  if (!validation.ok) {
+    return chatgptAuthErrorResponse(validation);
   }
 
   const { id } = await params;
-  const supabase = getSupabaseWithAccessToken(accessToken);
+  const supabase = getSupabase();
   const { data, error } = await supabase.from("rfps").select(selectFields).eq("id", id).maybeSingle();
 
   if (error) {
@@ -31,16 +31,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const accessToken = getBearerToken(request);
+  const validation = validateChatgptApiKey(request);
 
-  if (!accessToken) {
-    return unauthorizedResponse();
+  if (!validation.ok) {
+    return chatgptAuthErrorResponse(validation);
   }
 
   try {
     const { id } = await params;
     const payload = (await request.json()) as Partial<RfpInput>;
-    const supabase = getSupabaseWithAccessToken(accessToken);
+    const supabase = getSupabase();
     const { data, error } = await supabase.from("rfps").update(payload).eq("id", id).select(selectFields).single();
 
     if (error) {

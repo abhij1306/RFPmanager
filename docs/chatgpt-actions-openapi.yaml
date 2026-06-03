@@ -6,7 +6,7 @@ info:
 servers:
   - url: https://YOUR-VERCEL-DOMAIN.example.com
 security:
-  - rfpmanagerOAuth: []
+  - chatgptActionsApiKey: []
 paths:
   /api/chatgpt/rfps:
     get:
@@ -90,16 +90,10 @@ paths:
                     $ref: "#/components/schemas/Rfp"
 components:
   securitySchemes:
-    rfpmanagerOAuth:
-      type: oauth2
-      flows:
-        authorizationCode:
-          authorizationUrl: https://YOUR-SUPABASE-PROJECT.supabase.co/auth/v1/oauth/authorize
-          tokenUrl: https://YOUR-SUPABASE-PROJECT.supabase.co/auth/v1/oauth/token
-          scopes:
-            openid: Identify the signed-in RFPmanager user.
-            rfp:read: Read RFP opportunities.
-            rfp:write: Create and update RFP opportunities.
+    chatgptActionsApiKey:
+      type: http
+      scheme: bearer
+      description: Shared API key stored as CHATGPT_ACTIONS_API_KEY in RFPmanager and configured in the GPT Action.
   schemas:
     Rfp:
       type: object
