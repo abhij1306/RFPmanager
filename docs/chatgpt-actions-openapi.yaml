@@ -1,0 +1,203 @@
+openapi: 3.1.0
+info:
+  title: RFPmanager ChatGPT Actions
+  version: 0.1.0
+  description: Actions for reading and updating RFPmanager opportunities from ChatGPT.
+servers:
+  - url: https://YOUR-VERCEL-DOMAIN.example.com
+security:
+  - rfpmanagerOAuth: []
+paths:
+  /api/chatgpt/rfps:
+    get:
+      operationId: listRfps
+      summary: List RFP opportunities
+      responses:
+        "200":
+          description: RFP list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rfps:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Rfp"
+    post:
+      operationId: createRfp
+      summary: Create an RFP opportunity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RfpInput"
+      responses:
+        "201":
+          description: Created RFP
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rfp:
+                    $ref: "#/components/schemas/Rfp"
+  /api/chatgpt/rfps/{id}:
+    get:
+      operationId: getRfp
+      summary: Get one RFP opportunity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: RFP details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rfp:
+                    $ref: "#/components/schemas/Rfp"
+    patch:
+      operationId: updateRfp
+      summary: Update an RFP opportunity
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RfpUpdate"
+      responses:
+        "200":
+          description: Updated RFP
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  rfp:
+                    $ref: "#/components/schemas/Rfp"
+components:
+  securitySchemes:
+    rfpmanagerOAuth:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://YOUR-SUPABASE-PROJECT.supabase.co/auth/v1/oauth/authorize
+          tokenUrl: https://YOUR-SUPABASE-PROJECT.supabase.co/auth/v1/oauth/token
+          scopes:
+            openid: Identify the signed-in RFPmanager user.
+            rfp:read: Read RFP opportunities.
+            rfp:write: Create and update RFP opportunities.
+  schemas:
+    Rfp:
+      type: object
+      properties:
+        id:
+          type: string
+        client_name:
+          type: string
+        status:
+          type: string
+          enum: [Yes, No, TBD]
+        closing_date:
+          type: [string, "null"]
+        tender_code:
+          type: [string, "null"]
+        tender_link:
+          type: [string, "null"]
+        gdrive_link:
+          type: [string, "null"]
+        description:
+          type: [string, "null"]
+        contact_person:
+          type: [string, "null"]
+        contact_phone:
+          type: [string, "null"]
+        contact_email:
+          type: [string, "null"]
+        summary:
+          type: [string, "null"]
+        notes:
+          type: [string, "null"]
+        pipeline_stage:
+          type: string
+          enum: [Prospects, Active, Submitted, Won, Lost]
+        created_at:
+          type: string
+    RfpInput:
+      type: object
+      required: [client_name]
+      properties:
+        client_name:
+          type: string
+        status:
+          type: string
+          enum: [Yes, No, TBD]
+          default: TBD
+        closing_date:
+          type: [string, "null"]
+          description: ISO date in YYYY-MM-DD format.
+        closing_date_text:
+          type: [string, "null"]
+          description: Human-readable closing date if an ISO date is not available.
+        tender_code:
+          type: [string, "null"]
+        tender_link:
+          type: [string, "null"]
+        gdrive_link:
+          type: [string, "null"]
+        description:
+          type: [string, "null"]
+        contact_person:
+          type: [string, "null"]
+        contact_phone:
+          type: [string, "null"]
+        contact_email:
+          type: [string, "null"]
+        notes:
+          type: [string, "null"]
+        pipeline_stage:
+          type: string
+          enum: [Prospects, Active, Submitted, Won, Lost]
+          default: Prospects
+    RfpUpdate:
+      type: object
+      properties:
+        client_name:
+          type: string
+        status:
+          type: string
+          enum: [Yes, No, TBD]
+        closing_date:
+          type: [string, "null"]
+        tender_code:
+          type: [string, "null"]
+        tender_link:
+          type: [string, "null"]
+        gdrive_link:
+          type: [string, "null"]
+        description:
+          type: [string, "null"]
+        contact_person:
+          type: [string, "null"]
+        contact_phone:
+          type: [string, "null"]
+        contact_email:
+          type: [string, "null"]
+        notes:
+          type: [string, "null"]
+        pipeline_stage:
+          type: string
+          enum: [Prospects, Active, Submitted, Won, Lost]

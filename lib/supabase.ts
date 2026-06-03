@@ -10,3 +10,17 @@ export function getSupabase() {
 
   return createClient(supabaseUrl, supabaseAnonKey);
 }
+
+export function getSupabaseWithAccessToken(accessToken: string) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error("Missing Supabase environment variables. Copy .env.example to .env.local.");
+  }
+
+  return createClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    },
+  });
+}
