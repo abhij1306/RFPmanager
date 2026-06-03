@@ -25,6 +25,7 @@ export function RFPWorkspace({
   const [summary, setSummary] = useState(rfp.summary ?? "");
   const [summaryGeneratedAt, setSummaryGeneratedAt] = useState(rfp.summary_generated_at);
   const [message, setMessage] = useState<string | null>(null);
+  const [messageType, setMessageType] = useState<"info" | "error">("info");
   const [isPosting, setIsPosting] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
 
@@ -36,12 +37,14 @@ export function RFPWorkspace({
 
     setIsPosting(true);
     setMessage(null);
+    setMessageType("info");
 
     try {
       const saved = await createComment({ rfp_id: rfp.id, author_name: "Team", body });
       setCommentList((current) => [saved, ...current]);
       setCommentBody("");
     } catch (error) {
+      setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not add comment.");
     } finally {
       setIsPosting(false);
@@ -69,12 +72,14 @@ export function RFPWorkspace({
     const markdown = activeDocument?.markdown ?? documentList.map((document) => `# ${document.title}\n\n${document.markdown}`).join("\n\n");
 
     if (!markdown.trim()) {
+      setMessageType("error");
       setMessage("Save converted markdown before generating a summary.");
       return;
     }
 
     setIsSummarizing(true);
     setMessage(null);
+    setMessageType("info");
 
     try {
       const response = await fetch("/api/summarize", {
@@ -90,7 +95,10 @@ export function RFPWorkspace({
 
       setSummary(data.summary);
       setSummaryGeneratedAt(data.rfp?.summary_generated_at ?? new Date().toISOString());
+      setMessageType("info");
+      setMessage("Summary generated and autosaved.");
     } catch (error) {
+      setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not generate summary.");
     } finally {
       setIsSummarizing(false);
@@ -99,19 +107,19 @@ export function RFPWorkspace({
 
   return (
     <aside className="workspace-panel">
-      {message ? <div className="notice error">{message}</div> : null}
+      {message ? <div className={`notice ${messageType === "error" ? "error" : ""}`}>{message}</div> : null}
 
       <section className="workspace-section">
         <div className="section-heading">
           <div>
             <h2>Summary</h2>
-            <p>{summaryGeneratedAt ? `Generated ${formatDate(summaryGeneratedAt)}` : "Generate from saved markdown"}</p>
+            <p>{summaryGeneratedAt ? `Autosaved ${formatDate(summaryGeneratedAt)}` : "Generate from saved markdown"}</p>
           </div>
           <button className="button compact-button" disabled={isSummarizing} onClick={() => void generateSummary()} type="button">
             {isSummarizing ? "Generating..." : "Generate"}
           </button>
         </div>
-        {summary ? <textarea className="markdown-preview document-preview" readOnly value={summary} /> : <div className="empty-library">No summary generated yet.</div>}
+        {summary ? <pre className="markdown-preview document-preview">{summary}</pre> : <div className="empty-library">No summary generated yet.</div>}
       </section>
 
       <section className="workspace-section">
@@ -160,7 +168,7 @@ export function RFPWorkspace({
           {documentList.length === 0 ? <div className="empty-library">No markdown saved for this RFP yet.</div> : null}
         </div>
         {activeDocument ? (
-          <textarea className="markdown-preview document-preview" readOnly value={activeDocument.markdown} />
+          <pre className="markdown-preview document-preview">{activeDocument.markdown}</pre>
         ) : null}
       </section>
 

@@ -1,6 +1,17 @@
 import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
 import "./globals.css";
+
+const geistSans = Geist({
+  subsets: ["latin"],
+  variable: "--font-sans",
+});
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-mono",
+});
 
 export const metadata: Metadata = {
   title: "RFP Manager",
@@ -13,7 +24,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html className={`${geistSans.variable} ${geistMono.variable}`} lang="en">
       <body>
         <header className="app-header">
           <Link className="brand" href="/">

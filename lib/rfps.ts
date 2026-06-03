@@ -134,7 +134,7 @@ export async function createRfp(input: RfpInput): Promise<Rfp> {
   return data;
 }
 
-export async function updateRfp(id: string, input: RfpInput): Promise<Rfp> {
+export async function updateRfp(id: string, input: Partial<RfpInput>): Promise<Rfp> {
   const supabase = getSupabase();
   const { data, error } = await supabase.from("rfps").update(input).eq("id", id).select(selectFields).single();
 

@@ -51,6 +51,7 @@ export function RFPForm({ rfp }: { rfp?: Rfp | null }) {
   const router = useRouter();
   const [form, setForm] = useState<RfpInput>(() => inputFromRfp(rfp));
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const isEditing = Boolean(rfp);
 
@@ -61,29 +62,48 @@ export function RFPForm({ rfp }: { rfp?: Rfp | null }) {
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    setNotice(null);
     setIsSaving(true);
 
-    const input: RfpInput = {
-      ...form,
+    const editableInput = {
       client_name: form.client_name.trim(),
+      status: form.status,
       closing_date: form.closing_date || null,
       tender_code: cleanValue(form.tender_code ?? ""),
       tender_link: cleanValue(form.tender_link ?? ""),
       gdrive_link: cleanValue(form.gdrive_link ?? ""),
       description: cleanValue(form.description ?? ""),
       notes: cleanValue(form.notes ?? ""),
+      pipeline_stage: form.pipeline_stage,
     };
 
-    if (!input.client_name) {
+    if (!editableInput.client_name) {
       setError("Client name is required.");
       setIsSaving(false);
       return;
     }
 
     try {
-      const saved = isEditing && rfp ? await updateRfp(rfp.id, input) : await createRfp(input);
-      router.push(`/rfp/${saved.id}`);
-      router.refresh();
+      const saved =
+        isEditing && rfp
+          ? await updateRfp(rfp.id, editableInput)
+          : await createRfp({
+              ...editableInput,
+              document_links: form.document_links,
+              summary: form.summary,
+              summary_generated_at: form.summary_generated_at,
+            });
+
+      setForm(inputFromRfp(saved));
+
+      if (isEditing) {
+        setNotice("RFP saved.");
+        setIsSaving(false);
+        router.refresh();
+      } else {
+        router.push(`/rfp/${saved.id}`);
+        router.refresh();
+      }
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save this RFP.");
       setIsSaving(false);
@@ -111,6 +131,7 @@ export function RFPForm({ rfp }: { rfp?: Rfp | null }) {
   return (
     <form className="panel" onSubmit={onSubmit} style={{ padding: 20 }}>
       {error ? <div className="notice error">{error}</div> : null}
+      {notice ? <div className="notice">{notice}</div> : null}
       <div className="form-grid">
         <div className="form-field">
           <label htmlFor="client_name">Client Name</label>
