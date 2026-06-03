@@ -1,39 +1,58 @@
 .search-input {
-  max-width: 320px;
+  max-width: 360px;
 }
 
 .table-wrap {
-  overflow-x: auto;
+  max-height: calc(100svh - 190px);
+  overflow: auto;
 }
 
 table {
   width: 100%;
-  min-width: 850px;
-  border-collapse: collapse;
+  min-width: 980px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
 }
 
 th,
 td {
-  padding: 14px 16px;
+  height: 42px;
+  padding: 0 10px;
+  border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   text-align: left;
   vertical-align: middle;
+  white-space: nowrap;
+}
+
+th:last-child,
+td:last-child {
+  border-right: 0;
 }
 
 th {
-  color: var(--muted);
-  font-size: 12px;
-  letter-spacing: 0.08em;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: #3f4750;
+  background: #eceee8;
+  font-size: 11px;
+  font-weight: 800;
   text-transform: uppercase;
 }
 
+tbody tr {
+  background: var(--panel);
+}
+
 tbody tr:hover {
-  background: rgba(56, 189, 248, 0.06);
+  background: #eef4ff;
 }
 
 .row-link {
   color: var(--text);
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .row-link:hover,
@@ -45,49 +64,66 @@ tbody tr:hover {
   display: inline-flex;
   min-width: 48px;
   justify-content: center;
-  padding: 4px 8px;
+  padding: 3px 7px;
   border: 1px solid var(--line-strong);
   border-radius: 999px;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
   font-size: 12px;
+  font-weight: 750;
 }
 
 .status-yes {
-  color: #bbf7d0;
-  border-color: rgba(52, 211, 153, 0.5);
+  color: var(--ok);
+  background: #e6f4ea;
+  border-color: #b7dfc1;
 }
 
 .status-no {
-  color: #fecaca;
-  border-color: rgba(248, 113, 113, 0.5);
+  color: var(--danger);
+  background: #fce8e6;
+  border-color: #f4c7c3;
 }
 
 .status-tbd {
-  color: #fde68a;
-  border-color: rgba(245, 158, 11, 0.5);
+  color: var(--warning);
+  background: #fef7e0;
+  border-color: #fdd663;
 }
 
 .date-overdue {
   color: var(--danger);
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .date-soon {
   color: var(--warning);
-  font-weight: 700;
+  font-weight: 750;
 }
 
 .link-list {
   display: flex;
-  gap: 12px;
+  gap: 10px;
 }
 
 .link-list a {
   color: var(--accent);
+  font-weight: 700;
+}
+
+.count-link {
+  display: inline-flex;
+  min-width: 28px;
+  min-height: 24px;
+  align-items: center;
+  justify-content: center;
+  color: #174ea6;
+  background: var(--accent-soft);
+  border: 1px solid #d2e3fc;
+  border-radius: 999px;
+  font-weight: 800;
 }
 
 .empty {
-  padding: 40px 16px;
+  padding: 32px 16px;
   color: var(--muted);
   text-align: center;
 }

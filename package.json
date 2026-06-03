@@ -10,12 +10,14 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.44.4",
+    "@supabase/ssr": "^0.10.3",
+    "@supabase/supabase-js": "^2.107.0",
     "mammoth": "^1.8.0",
     "next": "^16.2.7",
     "pdfjs-dist": "^4.4.168",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
+    "read-excel-file": "^9.0.10",
     "turndown": "^7.2.0"
   },
   "devDependencies": {

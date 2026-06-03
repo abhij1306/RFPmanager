@@ -11,7 +11,27 @@ create table if not exists rfps (
   created_at timestamptz not null default now()
 );
 
+create table if not exists rfp_documents (
+  id uuid primary key default gen_random_uuid(),
+  rfp_id uuid not null references rfps(id) on delete cascade,
+  title text not null,
+  source_filename text,
+  source_type text not null default 'markdown' check (source_type in ('docx', 'pdf', 'xlsx', 'csv', 'markdown')),
+  markdown text not null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists rfp_comments (
+  id uuid primary key default gen_random_uuid(),
+  rfp_id uuid not null references rfps(id) on delete cascade,
+  author_name text not null default 'Team',
+  body text not null,
+  created_at timestamptz not null default now()
+);
+
 alter table rfps enable row level security;
+alter table rfp_documents enable row level security;
+alter table rfp_comments enable row level security;
 
 drop policy if exists "team can read rfps" on rfps;
 create policy "team can read rfps"
@@ -35,5 +55,55 @@ create policy "team can update rfps"
 drop policy if exists "team can delete rfps" on rfps;
 create policy "team can delete rfps"
   on rfps for delete
+  to anon
+  using (true);
+
+drop policy if exists "team can read rfp documents" on rfp_documents;
+create policy "team can read rfp documents"
+  on rfp_documents for select
+  to anon
+  using (true);
+
+drop policy if exists "team can insert rfp documents" on rfp_documents;
+create policy "team can insert rfp documents"
+  on rfp_documents for insert
+  to anon
+  with check (true);
+
+drop policy if exists "team can update rfp documents" on rfp_documents;
+create policy "team can update rfp documents"
+  on rfp_documents for update
+  to anon
+  using (true)
+  with check (true);
+
+drop policy if exists "team can delete rfp documents" on rfp_documents;
+create policy "team can delete rfp documents"
+  on rfp_documents for delete
+  to anon
+  using (true);
+
+drop policy if exists "team can read rfp comments" on rfp_comments;
+create policy "team can read rfp comments"
+  on rfp_comments for select
+  to anon
+  using (true);
+
+drop policy if exists "team can insert rfp comments" on rfp_comments;
+create policy "team can insert rfp comments"
+  on rfp_comments for insert
+  to anon
+  with check (true);
+
+drop policy if exists "team can update rfp comments" on rfp_comments;
+create policy "team can update rfp comments"
+  on rfp_comments for update
+  to anon
+  using (true)
+  with check (true);
+
+drop policy if exists "team can delete rfp comments" on rfp_comments;
+create policy "team can delete rfp comments"
+  on rfp_comments for delete
   to anon
   using (true);

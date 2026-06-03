@@ -6,7 +6,8 @@ A small team tool for managing RFP opportunities and converting RFP documents in
 
 - Shared RFP tracker backed by Supabase Postgres.
 - Add, edit, delete, filter, and open linked tender or Google Drive records.
-- Client-side DOCX/PDF to Markdown converter. Files are not uploaded or stored.
+- Save comments and converted Markdown documents against each RFP.
+- Client-side DOCX/PDF/Excel/CSV to Markdown converter.
 - Vercel-ready Next.js App Router project.
 
 ## Local Setup
@@ -25,7 +26,7 @@ cp .env.example .env.local
 
 3. Add your Supabase URL and anon key to `.env.local`.
 
-4. Create the database table using [supabase/schema.sql](supabase/schema.sql).
+4. Create or update the database tables using [supabase/schema.sql](supabase/schema.sql).
 
 5. Run the app:
 
@@ -35,7 +36,9 @@ npm run dev
 
 ## Supabase Setup
 
-Create a Supabase project and run [supabase/schema.sql](supabase/schema.sql) in the SQL editor. The schema enables Row Level Security and allows anonymous team access for this private shared app. Anyone with the deployed URL and anon key can read and write RFPs, so share the URL only with your team.
+Create a Supabase project and run [supabase/schema.sql](supabase/schema.sql) in the SQL editor. Re-run the same schema after pulling updates; it creates the RFP, saved Markdown document, and comment tables if they do not already exist.
+
+The schema enables Row Level Security and allows anonymous team access for this private shared app. Anyone with the deployed URL and anon key can read and write RFPs, comments, and saved Markdown, so share the URL only with your team.
 
 ## Vercel Deployment
 

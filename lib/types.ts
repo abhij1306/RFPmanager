@@ -25,5 +25,39 @@ export type RfpInput = {
   pipeline_stage: PipelineStage;
 };
 
+export type RfpDocumentSourceType = "docx" | "pdf" | "xlsx" | "csv" | "markdown";
+
+export type RfpDocument = {
+  id: string;
+  rfp_id: string;
+  title: string;
+  source_filename: string | null;
+  source_type: RfpDocumentSourceType;
+  markdown: string;
+  created_at: string;
+};
+
+export type RfpDocumentInput = {
+  rfp_id: string;
+  title: string;
+  source_filename: string | null;
+  source_type: RfpDocumentSourceType;
+  markdown: string;
+};
+
+export type RfpComment = {
+  id: string;
+  rfp_id: string;
+  author_name: string;
+  body: string;
+  created_at: string;
+};
+
+export type RfpCommentInput = {
+  rfp_id: string;
+  author_name: string;
+  body: string;
+};
+
 export const statuses: RfpStatus[] = ["TBD", "Yes", "No"];
 export const pipelineStages: PipelineStage[] = ["Prospects", "Active", "Submitted", "Won", "Lost"];

@@ -22,7 +22,15 @@ function applyFilter(rfp: Rfp, filter: Filter): boolean {
   return rfp.pipeline_stage === filter;
 }
 
-export function RFPTable({ rfps }: { rfps: Rfp[] }) {
+export function RFPTable({
+  commentCounts,
+  documentCounts,
+  rfps,
+}: {
+  commentCounts: Record<string, number>;
+  documentCounts: Record<string, number>;
+  rfps: Rfp[];
+}) {
   const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState("");
 
@@ -70,6 +78,8 @@ export function RFPTable({ rfps }: { rfps: Rfp[] }) {
               <th>Tender Code</th>
               <th>Links</th>
               <th>Pipeline Stage</th>
+              <th>Comments</th>
+              <th>Docs</th>
             </tr>
           </thead>
           <tbody>
@@ -104,12 +114,22 @@ export function RFPTable({ rfps }: { rfps: Rfp[] }) {
                     </div>
                   </td>
                   <td>{rfp.pipeline_stage}</td>
+                  <td>
+                    <Link className="count-link" href={`/rfp/${rfp.id}`}>
+                      {commentCounts[rfp.id] ?? 0}
+                    </Link>
+                  </td>
+                  <td>
+                    <Link className="count-link" href={`/rfp/${rfp.id}`}>
+                      {documentCounts[rfp.id] ?? 0}
+                    </Link>
+                  </td>
                 </tr>
               );
             })}
             {filteredRfps.length === 0 ? (
               <tr>
-                <td className="empty" colSpan={6}>
+                <td className="empty" colSpan={8}>
                   No RFPs match this view.
                 </td>
               </tr>
