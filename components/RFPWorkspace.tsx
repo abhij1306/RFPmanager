@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { createComment, deleteComment } from "@/lib/comments";
 import { convertFile } from "@/lib/document-conversion";
-import { createDocument, deleteDocument } from "@/lib/documents";
+import { createDocument } from "@/lib/documents";
 import { createRfpFileDownloadUrl, deleteRfpFile, uploadRfpFile } from "@/lib/rfp-files";
 import type { Rfp, RfpComment, RfpDocument, RfpDocumentSourceType, RfpFile } from "@/lib/types";
 
@@ -78,7 +78,6 @@ export function RFPWorkspace({
   const [documentList, setDocumentList] = useState(documents);
   const [fileList, setFileList] = useState(files);
   const [commentBody, setCommentBody] = useState("");
-  const [activeDocument, setActiveDocument] = useState<RfpDocument | null>(documents[0] ?? null);
   const [summary, setSummary] = useState(rfp.summary ?? "");
   const [summaryGeneratedAt, setSummaryGeneratedAt] = useState(rfp.summary_generated_at);
   const [markdownDraft, setMarkdownDraft] = useState("");
@@ -157,20 +156,6 @@ export function RFPWorkspace({
     } catch (error) {
       setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not delete comment.");
-    }
-  }
-
-  async function removeDocument(id: string) {
-    if (!window.confirm("Delete this saved markdown?")) return;
-    setMessage(null);
-    setMessageType("info");
-    try {
-      await deleteDocument(id);
-      setDocumentList((current) => current.filter((document) => document.id !== id));
-      if (activeDocument?.id === id) setActiveDocument(null);
-    } catch (error) {
-      setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not delete saved markdown.");
     }
   }
 
@@ -317,7 +302,7 @@ export function RFPWorkspace({
   const tabs: { id: WorkspaceTab; label: string; count?: number }[] = [
     { id: "summary", label: "Summary" },
     { id: "sources", label: "Sources", count: sourceFiles.length + rfp.document_links.length },
-    { id: "response", label: "Response", count: responseFiles.length + documentList.length },
+    { id: "response", label: "Response", count: responseFiles.length },
     { id: "team", label: "Team", count: commentList.length },
   ];
 
@@ -505,103 +490,58 @@ export function RFPWorkspace({
         </>
       )}
 
-      {/* ══ RESPONSE ═════════════════════════════════════════════════════════
-          Saved Markdown Documents · Response Files                            */}
+      {/* ══ RESPONSE ═════════════════════════════════════════════════════════ */}
       {activeTab === "response" && (
-        <>
-          <section className="workspace-section">
-            <div className="section-heading">
-              <div>
-                <h2>Documents</h2>
-                <p>{documentList.length} saved markdown files</p>
-              </div>
+        <section className="workspace-section">
+          <div className="section-heading">
+            <div>
+              <h2>Responses</h2>
+              <p>{responseFiles.length} response files saved</p>
             </div>
-            <div className="document-list compact-list">
-              {documentList.map((document) => (
-                <article
-                  className={`document-row ${activeDocument?.id === document.id ? "active" : ""}`}
-                  key={document.id}
-                >
-                  <div className="file-icon">MD</div>
-                  <button
-                    className="document-main text-button"
-                    onClick={() => setActiveDocument(document)}
-                    type="button"
-                  >
-                    <span className="document-title">{document.title}</span>
-                    <span className="document-meta">
-                      {document.source_type.toUpperCase()} · {formatDate(document.created_at)}
-                    </span>
-                  </button>
-                  <button
-                    className="ghost-button compact-button"
-                    onClick={() => void removeDocument(document.id)}
-                    type="button"
-                  >
-                    Delete
-                  </button>
-                </article>
-              ))}
-              {documentList.length === 0 ? (
-                <div className="empty-library">No markdown saved for this RFP yet.</div>
-              ) : null}
-            </div>
-            {activeDocument ? (
-              <pre className="markdown-preview document-preview">{activeDocument.markdown}</pre>
-            ) : null}
-          </section>
-
-          <section className="workspace-section">
-            <div className="section-heading">
-              <div>
-                <h2>Responses</h2>
-                <p>{responseFiles.length} response files saved</p>
-              </div>
-              <button
-                className="ghost-button compact-button"
-                onClick={() => responseInputRef.current?.click()}
-                type="button"
-              >
-                {isUploadingResponse ? "Uploading..." : "Upload"}
-              </button>
-            </div>
-            <input
-              accept={FILE_ACCEPT}
-              hidden
-              onChange={(event) => void uploadResponse(event.target.files)}
-              ref={responseInputRef}
-              type="file"
-            />
-            <textarea
-              className="textarea compact-textarea"
-              onChange={(event) => setResponseNotes(event.target.value)}
-              placeholder="Optional response notes"
-              value={responseNotes}
-            />
-            <div className="document-list compact-list">
-              {responseFiles.map((file) => (
-                <article className="document-row" key={file.id}>
-                  <div className="file-icon">RSP</div>
-                  <span className="document-main">
-                    <span className="document-title">{file.title}</span>
-                    <span className="document-meta">
-                      {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
-                    </span>
+            <button
+              className="ghost-button compact-button"
+              onClick={() => responseInputRef.current?.click()}
+              type="button"
+            >
+              {isUploadingResponse ? "Uploading..." : "Upload"}
+            </button>
+          </div>
+          <input
+            accept={FILE_ACCEPT}
+            hidden
+            onChange={(event) => void uploadResponse(event.target.files)}
+            ref={responseInputRef}
+            type="file"
+          />
+          <textarea
+            className="textarea compact-textarea"
+            onChange={(event) => setResponseNotes(event.target.value)}
+            placeholder="Optional response notes"
+            value={responseNotes}
+          />
+          <div className="document-list compact-list">
+            {responseFiles.map((file) => (
+              <article className="document-row" key={file.id}>
+                <div className="file-icon">RSP</div>
+                <span className="document-main">
+                  <span className="document-title">{file.title}</span>
+                  <span className="document-meta">
+                    {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
                   </span>
-                  <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
-                    Download
-                  </button>
-                  <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
-                    Delete
-                  </button>
-                </article>
-              ))}
-              {responseFiles.length === 0 ? (
-                <div className="empty-library">Response files will appear here.</div>
-              ) : null}
-            </div>
-          </section>
-        </>
+                </span>
+                <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
+                  Download
+                </button>
+                <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
+                  Delete
+                </button>
+              </article>
+            ))}
+            {responseFiles.length === 0 ? (
+              <div className="empty-library">Response files will appear here.</div>
+            ) : null}
+          </div>
+        </section>
       )}
 
       {/* ══ TEAM ═════════════════════════════════════════════════════════════
