@@ -1,0 +1,61 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { deleteRfp } from "@/lib/rfps";
+
+export function RFPHeaderActions({
+  formId,
+  gdriveLink,
+  rfpId,
+  tenderLink,
+}: {
+  formId: string;
+  gdriveLink: string | null;
+  rfpId: string;
+  tenderLink: string | null;
+}) {
+  const router = useRouter();
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  async function onDelete() {
+    if (!window.confirm("Delete this RFP?")) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      await deleteRfp(rfpId);
+      router.push("/");
+      router.refresh();
+    } catch (error) {
+      setIsDeleting(false);
+      window.alert(error instanceof Error ? error.message : "Could not delete this RFP.");
+    }
+  }
+
+  return (
+    <div className="header-actions">
+      <button className="button" form={formId} type="submit">
+        Save RFP
+      </button>
+      <button className="ghost-button" onClick={() => router.push("/")} type="button">
+        Back
+      </button>
+      {tenderLink ? (
+        <a className="ghost-button" href={tenderLink} rel="noreferrer" target="_blank">
+          Open Tender Link
+        </a>
+      ) : null}
+      {gdriveLink ? (
+        <a className="ghost-button" href={gdriveLink} rel="noreferrer" target="_blank">
+          Open Google Drive
+        </a>
+      ) : null}
+      <button className="danger-button" disabled={isDeleting} onClick={() => void onDelete()} type="button">
+        {isDeleting ? "Deleting..." : "Delete"}
+      </button>
+    </div>
+  );
+}

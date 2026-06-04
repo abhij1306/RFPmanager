@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { uploadSourceDocuments } from "@/lib/rfp-source-documents";
-import { createRfp, deleteRfp, updateRfp } from "@/lib/rfps";
+import { createRfp, updateRfp } from "@/lib/rfps";
 import type { Rfp, RfpInput } from "@/lib/types";
 import { pipelineStages, statuses } from "@/lib/types";
 
@@ -63,7 +63,15 @@ function inputFromRfp(rfp?: Rfp | null): RfpInput {
   };
 }
 
-export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: Rfp | null }) {
+export function RFPForm({
+  formId = "rfp-form",
+  initialInput,
+  rfp,
+}: {
+  formId?: string;
+  initialInput?: RfpInput;
+  rfp?: Rfp | null;
+}) {
   const router = useRouter();
   const [form, setForm] = useState<RfpInput>(() => initialInput ?? inputFromRfp(rfp));
   const [error, setError] = useState<string | null>(null);
@@ -158,26 +166,8 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
     }
   }
 
-  async function onDelete() {
-    if (!rfp || !window.confirm("Delete this RFP?")) {
-      return;
-    }
-
-    setError(null);
-    setIsSaving(true);
-
-    try {
-      await deleteRfp(rfp.id);
-      router.push("/");
-      router.refresh();
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "Could not delete this RFP.");
-      setIsSaving(false);
-    }
-  }
-
   return (
-    <form className="rfp-form" onSubmit={onSubmit}>
+    <form className="rfp-form" id={formId} onSubmit={onSubmit}>
       {error ? <div className="notice error">{error}</div> : null}
       {notice ? <div className="notice">{notice}</div> : null}
       <section className="form-card">
@@ -357,29 +347,16 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
         </div>
       </div>
       </section>
-      <div className="form-actions">
-        <button className="button" disabled={isSaving} type="submit">
-          {isSaving ? (sourceUploadProgress ? `Saving docs ${sourceUploadProgress}` : "Saving...") : isEditing ? "Save RFP" : "Create RFP"}
-        </button>
-        <button className="ghost-button" onClick={() => router.push("/")} type="button">
-          Back
-        </button>
-        {rfp?.tender_link ? (
-          <a className="ghost-button" href={rfp.tender_link} rel="noreferrer" target="_blank">
-            Open Tender Link
-          </a>
-        ) : null}
-        {rfp?.gdrive_link ? (
-          <a className="ghost-button" href={rfp.gdrive_link} rel="noreferrer" target="_blank">
-            Open Google Drive
-          </a>
-        ) : null}
-        {isEditing ? (
-          <button className="danger-button" disabled={isSaving} onClick={onDelete} type="button">
-            Delete
+      {!isEditing ? (
+        <div className="form-actions">
+          <button className="button" disabled={isSaving} type="submit">
+            {isSaving ? (sourceUploadProgress ? `Saving docs ${sourceUploadProgress}` : "Saving...") : "Create RFP"}
           </button>
-        ) : null}
-      </div>
+          <button className="ghost-button" onClick={() => router.push("/")} type="button">
+            Back
+          </button>
+        </div>
+      ) : null}
     </form>
   );
 }

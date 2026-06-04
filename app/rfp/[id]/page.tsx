@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { RFPForm } from "@/components/RFPForm";
+import { RFPHeaderActions } from "@/components/RFPHeaderActions";
 import { RFPWorkspace } from "@/components/RFPWorkspace";
 import { listCommentsByRfp } from "@/lib/comments";
 import { listDocumentsByRfp } from "@/lib/documents";
@@ -29,6 +30,7 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
   }
 
   const [displayTitle, issuedBy] = rfp.client_name.split(/\s+-\s+Issued by\s+/i);
+  const formId = "rfp-detail-form";
 
   return (
     <div className="shell">
@@ -41,10 +43,11 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
               .join(" · ") || "Edit links, status, dates, and team notes for this RFP."}
           </p>
         </div>
+        <RFPHeaderActions formId={formId} gdriveLink={rfp.gdrive_link} rfpId={rfp.id} tenderLink={rfp.tender_link} />
       </section>
       {workspaceError ? <div className="notice error">{workspaceError}</div> : null}
       <div className="detail-layout">
-        <RFPForm rfp={rfp} />
+        <RFPForm formId={formId} rfp={rfp} />
         <RFPWorkspace comments={comments} documents={documents} files={files} rfp={rfp} />
       </div>
     </div>
