@@ -388,19 +388,77 @@ export function RFPWorkspace({
       {/* ══ SOURCES ══════════════════════════════════════════════════════════ */}
       {activeTab === "sources" && (
         <div className="sources-tab">
+
+          {/* ── 1. What you have: Tender Links + Uploaded Files ── */}
+          <div className="source-assets-grid">
+            <section className="workspace-section">
+              <div className="section-heading">
+                <div>
+                  <h2>Tender Links</h2>
+                  <p>{rfp.document_links.length} imported document URLs</p>
+                </div>
+              </div>
+              <div className="document-list compact-list">
+                {rfp.document_links.map((link) => (
+                  <a
+                    className="document-row"
+                    href={link.url}
+                    key={`${link.name}-${link.url}`}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <div className="file-icon">URL</div>
+                    <span className="document-main">
+                      <span className="document-title">{link.name || link.url}</span>
+                      <span className="document-meta">{link.url}</span>
+                    </span>
+                  </a>
+                ))}
+                {rfp.document_links.length === 0 ? (
+                  <div className="empty-library">Imported tender document links will appear here.</div>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="workspace-section">
+              <div className="section-heading">
+                <div>
+                  <h2>Uploaded Files</h2>
+                  <p>{sourceFiles.length} original files saved</p>
+                </div>
+              </div>
+              <div className="document-list compact-list">
+                {sourceFiles.map((file) => (
+                  <article className="document-row" key={file.id}>
+                    <div className="file-icon">SRC</div>
+                    <span className="document-main">
+                      <span className="document-title">{file.title}</span>
+                      <span className="document-meta">
+                        {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
+                      </span>
+                    </span>
+                    <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
+                      Download
+                    </button>
+                    <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
+                      Delete
+                    </button>
+                  </article>
+                ))}
+                {sourceFiles.length === 0 ? (
+                  <div className="empty-library">Original uploaded documents will appear here.</div>
+                ) : null}
+              </div>
+            </section>
+          </div>
+
+          {/* ── 2. What you do: Convert to Markdown ── */}
           <section className="workspace-section">
             <div className="section-heading">
               <div>
-                <h2>Add Markdown</h2>
-                <p>{sourceFileName || "Upload a file or paste markdown"}</p>
+                <h2>Convert to Markdown</h2>
+                <p>Upload a document or paste markdown below</p>
               </div>
-              <button
-                className="ghost-button compact-button"
-                onClick={() => sourceInputRef.current?.click()}
-                type="button"
-              >
-                {isConverting ? "Converting..." : "Upload"}
-              </button>
             </div>
             <input
               accept={FILE_ACCEPT}
@@ -409,6 +467,19 @@ export function RFPWorkspace({
               ref={sourceInputRef}
               type="file"
             />
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+              <button
+                className="ghost-button compact-button"
+                onClick={() => sourceInputRef.current?.click()}
+                style={{ flexShrink: 0 }}
+                type="button"
+              >
+                {isConverting ? "Converting..." : "↑ Upload File"}
+              </button>
+              <span className="document-meta" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {sourceFileName || "DOCX · PDF · XLSX · CSV · MD · TXT"}
+              </span>
+            </div>
             <input
               className="input"
               onChange={(event) => setMarkdownTitle(event.target.value)}
@@ -421,7 +492,7 @@ export function RFPWorkspace({
                 setMarkdownDraft(event.target.value);
                 if (!sourceFileName) setSourceType("markdown");
               }}
-              placeholder="Paste markdown here, or upload DOCX, PDF, XLSX, CSV, MD, or TXT."
+              placeholder="Paste markdown here, or upload a file above to auto-convert."
               value={markdownDraft}
             />
             <div className="form-actions flush-actions">
@@ -439,11 +510,12 @@ export function RFPWorkspace({
                 onClick={() => void saveMarkdown(true)}
                 type="button"
               >
-                Save & Generate
+                {isSavingMarkdown || isSummarizing ? "Working..." : "Save & Generate"}
               </button>
             </div>
           </section>
 
+          {/* ── 3. What you've built: Saved Markdown Library ── */}
           <section className="workspace-section source-markdown-section">
             <div className="section-heading">
               <div>
@@ -477,67 +549,6 @@ export function RFPWorkspace({
             </div>
           </section>
 
-          <div className="source-assets-grid">
-            <section className="workspace-section">
-              <div className="section-heading">
-                <div>
-                  <h2>Uploaded Files</h2>
-                  <p>{sourceFiles.length} original files saved</p>
-                </div>
-              </div>
-              <div className="document-list compact-list">
-                {sourceFiles.map((file) => (
-                  <article className="document-row" key={file.id}>
-                    <div className="file-icon">SRC</div>
-                    <span className="document-main">
-                      <span className="document-title">{file.title}</span>
-                      <span className="document-meta">
-                        {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
-                      </span>
-                    </span>
-                    <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
-                      Download
-                    </button>
-                    <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
-                      Delete
-                    </button>
-                  </article>
-                ))}
-                {sourceFiles.length === 0 ? (
-                  <div className="empty-library">Original uploaded documents will appear here.</div>
-                ) : null}
-              </div>
-            </section>
-
-            <section className="workspace-section">
-              <div className="section-heading">
-                <div>
-                  <h2>Tender Links</h2>
-                  <p>{rfp.document_links.length} imported document URLs</p>
-                </div>
-              </div>
-              <div className="document-list compact-list">
-                {rfp.document_links.map((link) => (
-                  <a
-                    className="document-row"
-                    href={link.url}
-                    key={`${link.name}-${link.url}`}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    <div className="file-icon">URL</div>
-                    <span className="document-main">
-                      <span className="document-title">{link.name || link.url}</span>
-                      <span className="document-meta">{link.url}</span>
-                    </span>
-                  </a>
-                ))}
-                {rfp.document_links.length === 0 ? (
-                  <div className="empty-library">Imported tender document links will appear here.</div>
-                ) : null}
-              </div>
-            </section>
-          </div>
         </div>
       )}
 
