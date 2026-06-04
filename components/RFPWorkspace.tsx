@@ -281,7 +281,6 @@ export function RFPWorkspace({
       });
       const nextDocuments = [saved, ...documentList];
       setDocumentList(nextDocuments);
-      setActiveDocument(saved);
       setMarkdownDraft("");
       setMarkdownTitle("");
       setSourceFileName("");
