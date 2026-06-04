@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { toDocumentSummary } from "@/lib/chatgpt-documents";
 import { normalizeOpenAiFileRefs } from "@/lib/chatgpt-files";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
 import { convertBufferToMarkdown } from "@/lib/document-conversion-server";
@@ -62,7 +63,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         source_type: result.sourceType,
         markdown: result.markdown,
       });
-      saved.push({ document, source_file: sourceFile });
+      saved.push({ document: toDocumentSummary(document), source_file: sourceFile });
     }
 
     return NextResponse.json({ saved }, { status: 201 });

@@ -9,6 +9,8 @@ const navItems = [
   { href: "/bookmarklet", label: "Import" },
 ];
 
+const gptUrl = "https://chatgpt.com/g/g-6a204eb74ff0819197b925c02a12e970-rfpmanager";
+
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") {
     return pathname === "/" || pathname.startsWith("/rfp");
@@ -27,6 +29,9 @@ export function AppNav() {
           {item.label}
         </Link>
       ))}
+      <a className="gpt-nav-link" href={gptUrl} rel="noreferrer" target="_blank">
+        RFP GPT
+      </a>
     </nav>
   );
 }

@@ -18,7 +18,16 @@ paths:
       description: >
         Use this operation for requests like "show all RFPs", "list RFPs",
         "pipeline", "opportunities", "active RFPs", "upcoming deadlines",
-        or when searching by client name or tender code.
+        or searches by client name or tender code. If the user names a client,
+        tender code, or opportunity, use search to find the RFP instead of
+        asking for a UUID.
+      parameters:
+        - name: search
+          in: query
+          required: false
+          description: Client name, tender code, keyword, or opportunity detail to search for.
+          schema:
+            type: string
       responses:
         "200":
           description: List of RFP opportunities.
@@ -60,8 +69,10 @@ paths:
       operationId: getRfp
       summary: Get one RFP opportunity by UUID
       description: >
-        Use this only when the user provides a specific RFP UUID.
-        Do not use this operation for "all RFPs" or general list requests.
+        Use only when the RFP UUID is already known from an action response.
+        If the user gives a client name, tender code, or description, call
+        listRfps with search first. Do not ask for UUIDs unless search is
+        ambiguous or empty.
       parameters:
         - name: id
           in: path
@@ -86,8 +97,10 @@ paths:
       operationId: updateRfp
       summary: Update one RFP opportunity by UUID
       description: >
-        Use this only when updating an existing RFP and the correct RFP UUID is known.
-        If only a client name or tender code is given, call listRfps first to find the record.
+        Use only when updating an RFP whose UUID is known from an action
+        response. If the user gives a client name, tender code, or description,
+        call listRfps with search first. Do not ask for UUIDs unless search is
+        ambiguous or empty.
       parameters:
         - name: id
           in: path
@@ -117,8 +130,66 @@ paths:
   /api/chatgpt/rfps/{id}/documents:
     get:
       operationId: listRfpDocuments
-      summary: List saved source documents and Markdown for one RFP
-      description: Use this before adding summaries or responses when the GPT needs to inspect saved tender source files and converted Markdown.
+      summary: List saved source document metadata for one RFP
+      description: >
+        Returns lightweight document metadata only. Does not return full
+        Markdown, source file objects, download URLs, or large previews. To
+        read content, call getRfpDocumentMarkdown with offset/limit.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The UUID of the RFP record.
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 10
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Lightweight saved document metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  documents:
+                    type: array
+                    maxItems: 20
+                    items:
+                      $ref: "#/components/schemas/RfpDocumentSummary"
+                  total:
+                    type: integer
+                  offset:
+                    type: integer
+                  limit:
+                    type: integer
+                  has_more:
+                    type: boolean
+                  next_offset:
+                    type: ["integer", "null"]
+
+  /api/chatgpt/rfps/{id}/source-files:
+    get:
+      operationId: listRfpSourceFiles
+      summary: List original source files for one RFP
+      description: >
+        Use only when source file objects or temporary download URLs are needed.
+        Do not call this before reading saved Markdown.
       parameters:
         - name: id
           in: path
@@ -129,21 +200,69 @@ paths:
             format: uuid
       responses:
         "200":
-          description: Saved Markdown documents and original source files.
+          description: Original source files with temporary download URLs when available.
           content:
             application/json:
               schema:
                 type: object
                 additionalProperties: false
                 properties:
-                  documents:
-                    type: array
-                    items:
-                      $ref: "#/components/schemas/RfpDocument"
                   source_files:
                     type: array
                     items:
                       $ref: "#/components/schemas/RfpFileWithDownload"
+
+  /api/chatgpt/rfps/{id}/documents/{documentId}:
+    get:
+      operationId: getRfpDocumentMarkdown
+      summary: Get a bounded Markdown excerpt from one saved RFP document
+      description: >
+        Use this to read saved Markdown in chunks. Start with offset 0. If
+        has_more is true, call again with next_offset. Keep limit modest unless
+        the user explicitly asks for a larger extract.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The UUID of the RFP record, found through listRfps if needed.
+          schema:
+            type: string
+            format: uuid
+        - name: documentId
+          in: path
+          required: true
+          description: The saved document UUID from listRfpDocuments.
+          schema:
+            type: string
+            format: uuid
+        - name: offset
+          in: query
+          required: false
+          description: Character offset to start reading from.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - name: limit
+          in: query
+          required: false
+          description: Maximum characters to return. The API caps this at 12000.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12000
+            default: 6000
+      responses:
+        "200":
+          description: A bounded Markdown excerpt and pagination metadata.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  document:
+                    $ref: "#/components/schemas/RfpDocumentExcerpt"
 
   /api/chatgpt/rfps/{id}/documents/convert:
     post:
@@ -183,7 +302,7 @@ paths:
                       additionalProperties: false
                       properties:
                         document:
-                          $ref: "#/components/schemas/RfpDocument"
+                          $ref: "#/components/schemas/RfpDocumentSummary"
                         source_file:
                           $ref: "#/components/schemas/RfpFile"
 
@@ -390,6 +509,54 @@ components:
         created_at:
           type: string
 
+    RfpDocumentSummary:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          format: uuid
+        rfp_id:
+          type: string
+          format: uuid
+        source_file_id:
+          type: ["string", "null"]
+          format: uuid
+        title:
+          type: string
+          maxLength: 200
+        source_filename:
+          type: ["string", "null"]
+          maxLength: 255
+        source_type:
+          type: string
+          enum: ["docx", "pdf", "xlsx", "csv", "markdown"]
+        markdown_length:
+          type: integer
+        markdown_preview:
+          type: string
+          maxLength: 500
+          description: First 500 characters only.
+        created_at:
+          type: string
+
+    RfpDocumentExcerpt:
+      allOf:
+        - $ref: "#/components/schemas/RfpDocumentSummary"
+        - type: object
+          additionalProperties: false
+          properties:
+            markdown:
+              type: string
+            offset:
+              type: integer
+            limit:
+              type: integer
+            next_offset:
+              type: ["integer", "null"]
+            has_more:
+              type: boolean
+
     RfpFile:
       type: object
       additionalProperties: false
@@ -432,8 +599,10 @@ components:
           additionalProperties: false
           properties:
             download_url:
-              type: string
+              type: ["string", "null"]
               format: uri
+            download_error:
+              type: string
 
     RfpInput:
       type: object

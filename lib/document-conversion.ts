@@ -1,5 +1,6 @@
 import TurndownService from "turndown";
 import { getAllowedFileSourceType } from "@/lib/chatgpt-files";
+import { cleanConvertedMarkdown, removeHtmlImages } from "@/lib/document-markdown-cleanup";
 import type { RfpDocumentSourceType } from "@/lib/types";
 
 export type ConversionResult = {
@@ -77,7 +78,9 @@ export function parseCsv(text: string): string[][] {
 }
 
 function htmlToMarkdown(html: string): string {
-  return new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" }).turndown(html);
+  const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
+  turndown.remove("img");
+  return cleanConvertedMarkdown(turndown.turndown(removeHtmlImages(html)));
 }
 
 async function convertDocx(file: File): Promise<string> {
@@ -102,7 +105,7 @@ async function convertPdf(file: File): Promise<string> {
     pages.push(`## Page ${pageNumber}\n\n${text.trim()}`);
   }
 
-  return pages.join("\n\n");
+  return cleanConvertedMarkdown(pages.join("\n\n"));
 }
 
 async function convertSpreadsheet(file: File, extension: "xlsx" | "csv"): Promise<string> {
@@ -131,7 +134,7 @@ export async function convertFile(file: File): Promise<ConversionResult> {
   }
 
   if (sourceType === "markdown") {
-    return { markdown: await file.text(), sourceType: "markdown" };
+    return { markdown: cleanConvertedMarkdown(await file.text()), sourceType: "markdown" };
   }
 
   throw new Error("Upload a DOCX, PDF, XLSX, CSV, MD, Markdown, or TXT file.");

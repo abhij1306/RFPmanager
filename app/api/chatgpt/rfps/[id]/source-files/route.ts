@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
-import { paginateDocumentSummaries } from "@/lib/chatgpt-documents";
-import { listDocumentsByRfp } from "@/lib/documents";
+import { toSourceFileSummaries } from "@/lib/chatgpt-source-files";
+import { createRfpFileDownloadUrl, listFilesByRfp } from "@/lib/rfp-files";
 import { getRfp } from "@/lib/rfps";
 
 export const dynamic = "force-dynamic";
@@ -20,10 +20,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "RFP not found." }, { status: 404 });
   }
 
-  const searchParams = new URL(request.url).searchParams;
-  const offset = Number(searchParams.get("offset") ?? "0");
-  const limit = Number(searchParams.get("limit") ?? undefined);
-  const documents = await listDocumentsByRfp(id);
+  const sourceFiles = await toSourceFileSummaries(await listFilesByRfp(id), createRfpFileDownloadUrl);
 
-  return NextResponse.json(paginateDocumentSummaries(documents, { offset, limit }));
+  return NextResponse.json({ source_files: sourceFiles });
 }

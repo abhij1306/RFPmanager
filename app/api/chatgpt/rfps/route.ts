@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
+import { filterRfpsForChatgpt } from "@/lib/chatgpt-rfps";
 import { getSupabase } from "@/lib/supabase";
 import { normalizeImportedRfp } from "@/lib/rfps";
 import type { Rfp, RfpImportInput } from "@/lib/types";
@@ -27,7 +28,9 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  return NextResponse.json({ rfps: data ?? [] });
+  const search = new URL(request.url).searchParams.get("search");
+
+  return NextResponse.json({ rfps: filterRfpsForChatgpt((data ?? []) as Rfp[], search) });
 }
 
 export async function POST(request: Request) {

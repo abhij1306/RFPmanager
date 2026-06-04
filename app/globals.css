@@ -140,12 +140,14 @@ main {
 }
 
 .app-header nav {
+  flex-shrink: 0;
   gap: 18px;
   padding-right: 18px;
   border-right: 1px solid var(--line);
 }
 
 .app-header nav a {
+  flex: 0 0 auto;
   min-height: 28px;
   padding: 0 0 5px;
   color: var(--muted);
@@ -160,6 +162,23 @@ main {
 .app-header nav a:hover {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+
+.app-header nav a.gpt-nav-link {
+  min-height: 30px;
+  align-content: center;
+  padding: 0 10px;
+  color: #fff;
+  background: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  line-height: 28px;
+}
+
+.app-header nav a.gpt-nav-link:hover {
+  color: #fff;
+  background: #185abc;
+  border-color: #185abc;
 }
 
 .shell {

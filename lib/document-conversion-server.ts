@@ -1,9 +1,12 @@
 import TurndownService from "turndown";
 import { getAllowedFileSourceType } from "@/lib/chatgpt-files";
+import { cleanConvertedMarkdown, removeHtmlImages } from "@/lib/document-markdown-cleanup";
 import { parseCsv, sheetRowsToMarkdown, type ConversionResult } from "@/lib/document-conversion";
 
 function htmlToMarkdown(html: string): string {
-  return new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" }).turndown(html);
+  const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
+  turndown.remove("img");
+  return cleanConvertedMarkdown(turndown.turndown(removeHtmlImages(html)));
 }
 
 async function convertDocxBuffer(buffer: ArrayBuffer): Promise<string> {
@@ -24,7 +27,7 @@ async function convertPdfBuffer(arrayBuffer: ArrayBuffer): Promise<string> {
     pages.push(`## Page ${pageNumber}\n\n${text.trim()}`);
   }
 
-  return pages.join("\n\n");
+  return cleanConvertedMarkdown(pages.join("\n\n"));
 }
 
 export async function convertBufferToMarkdown({
@@ -58,5 +61,5 @@ export async function convertBufferToMarkdown({
     return { markdown: sheets.map(({ sheet, data }) => sheetRowsToMarkdown(sheet, data)).join("\n\n"), sourceType };
   }
 
-  return { markdown: new TextDecoder().decode(buffer), sourceType: "markdown" };
+  return { markdown: cleanConvertedMarkdown(new TextDecoder().decode(buffer)), sourceType: "markdown" };
 }
