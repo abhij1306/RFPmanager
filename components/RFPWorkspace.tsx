@@ -5,9 +5,10 @@ import { createComment, deleteComment } from "@/lib/comments";
 import { convertFile } from "@/lib/document-conversion";
 import { createDocument, deleteDocument } from "@/lib/documents";
 import { createRfpFileDownloadUrl, deleteRfpFile, uploadRfpFile } from "@/lib/rfp-files";
+import { uploadSourceDocuments } from "@/lib/rfp-source-documents";
 import type { Rfp, RfpComment, RfpDocument, RfpDocumentSourceType, RfpFile } from "@/lib/types";
 
-type WorkspaceTab = "summary" | "sources" | "response" | "team";
+type WorkspaceTab = "summary" | "sources" | "markdown" | "response" | "team";
 
 const FILE_ACCEPT =
   ".docx,.pdf,.xlsx,.csv,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain";
@@ -20,47 +21,15 @@ function combineDocumentMarkdown(documents: RfpDocument[]): string {
   return documents.map((document) => `# ${document.title}\n\n${document.markdown}`).join("\n\n");
 }
 
-// ─── Tab nav styles ───────────────────────────────────────────────────────────
-const tabNavStyle: React.CSSProperties = {
-  display: "flex",
-  padding: 3,
-  border: "1px solid var(--line)",
-  borderRadius: 8,
-  background: "var(--soft)",
-  flexShrink: 0,
-};
+function formatFileMeta(file: RfpFile): string {
+  const size =
+    file.file_size_bytes && file.file_size_bytes > 0
+      ? `${(file.file_size_bytes / 1024 / 1024).toFixed(1)} MB`
+      : file.status ?? "Saved";
+  const type = file.original_filename.split(".").pop()?.toUpperCase() ?? "FILE";
 
-function tabStyle(active: boolean): React.CSSProperties {
-  return {
-    display: "flex",
-    alignItems: "center",
-    gap: 5,
-    padding: "10px 13px",
-    fontSize: 11,
-    fontWeight: 600,
-    letterSpacing: "0.07em",
-    textTransform: "uppercase",
-    border: "none",
-    borderRadius: 6,
-    background: active ? "var(--accent-soft)" : "transparent",
-    color: active ? "#174ea6" : "var(--muted)",
-    cursor: "pointer",
-    transition: "color 0.12s, background-color 0.12s",
-    whiteSpace: "nowrap",
-  };
+  return `${size} · ${type}`;
 }
-
-function badgeStyle(active: boolean): React.CSSProperties {
-  return {
-    fontSize: 10,
-    padding: "1px 5px",
-    borderRadius: 9999,
-    fontFamily: "var(--font-mono, monospace)",
-    background: active ? "#d2e3fc" : "var(--surface)",
-    color: active ? "#174ea6" : "var(--muted)",
-  };
-}
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function RFPWorkspace({
   comments,
@@ -78,7 +47,7 @@ export function RFPWorkspace({
   const [documentList, setDocumentList] = useState(documents);
   const [fileList, setFileList] = useState(files);
   const [commentBody, setCommentBody] = useState("");
-  const [activeDocument, setActiveDocument] = useState<RfpDocument | null>(documents[0] ?? null);
+  const [activeDocument, setActiveDocument] = useState<RfpDocument | null>(null);
   const [summary, setSummary] = useState(rfp.summary ?? "");
   const [summaryGeneratedAt, setSummaryGeneratedAt] = useState(rfp.summary_generated_at);
   const [markdownDraft, setMarkdownDraft] = useState("");
@@ -94,9 +63,12 @@ export function RFPWorkspace({
   const [isUploadingResponse, setIsUploadingResponse] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>("summary");
+  const [bulkProgress, setBulkProgress] = useState("");
+  const [isBulkUploading, setIsBulkUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("sources");
 
   const sourceInputRef = useRef<HTMLInputElement>(null);
+  const bulkSourceInputRef = useRef<HTMLInputElement>(null);
   const responseInputRef = useRef<HTMLInputElement>(null);
   const sourceFiles = fileList.filter((file) => file.kind === "source");
   const responseFiles = fileList.filter((file) => file.kind === "response");
@@ -233,6 +205,42 @@ export function RFPWorkspace({
     }
   }
 
+  async function bulkUploadSources(files: FileList | null) {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+
+    setIsBulkUploading(true);
+    setBulkProgress(`0/${selectedFiles.length}`);
+    setMessage(null);
+    setMessageType("info");
+
+    try {
+      const saved = await uploadSourceDocuments({
+        files: selectedFiles,
+        onProgress: (completed, total, file) => {
+          setBulkProgress(`${completed}/${total}`);
+          setMessage(`Saved ${completed}/${total}: ${file.name}`);
+        },
+        rfpId: rfp.id,
+      });
+      const savedDocuments = saved.map((item) => item.document);
+      const savedFiles = saved.map((item) => item.sourceFile);
+      const nextDocuments = [...savedDocuments, ...documentList];
+
+      setDocumentList(nextDocuments);
+      setFileList((current) => [...savedFiles, ...current]);
+      setActiveDocument(savedDocuments[0] ?? activeDocument);
+      setMessage(`${saved.length} source document${saved.length === 1 ? "" : "s"} saved with converted markdown.`);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not bulk upload source documents.");
+    } finally {
+      setIsBulkUploading(false);
+      setBulkProgress("");
+      if (bulkSourceInputRef.current) bulkSourceInputRef.current.value = "";
+    }
+  }
+
   async function generateSummary(documentsToSummarize = documentList) {
     const markdown = combineDocumentMarkdown(documentsToSummarize);
     if (!markdown.trim()) {
@@ -317,8 +325,9 @@ export function RFPWorkspace({
 
   // ── Tab config ────────────────────────────────────────────────────────────
   const tabs: { id: WorkspaceTab; label: string; count?: number }[] = [
+    { id: "sources", label: "Sources", count: sourceFiles.length + rfp.document_links.length },
+    { id: "markdown", label: "Markdown", count: documentList.length },
     { id: "summary", label: "Summary" },
-    { id: "sources", label: "Sources", count: documentList.length + sourceFiles.length + rfp.document_links.length },
     { id: "response", label: "Response", count: responseFiles.length },
     { id: "team", label: "Team", count: commentList.length },
   ];
@@ -332,25 +341,17 @@ export function RFPWorkspace({
       ) : null}
 
       {/* ── Tab bar ── */}
-      <nav style={tabNavStyle}>
+      <nav className="workspace-tabs">
         {tabs.map((tab) => (
           <button
+            className={`workspace-tab ${activeTab === tab.id ? "active" : ""}`}
             key={tab.id}
             type="button"
-            style={tabStyle(activeTab === tab.id)}
             onClick={() => setActiveTab(tab.id)}
-            onMouseEnter={(e) => {
-              if (activeTab !== tab.id)
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--text)";
-            }}
-            onMouseLeave={(e) => {
-              if (activeTab !== tab.id)
-                (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)";
-            }}
           >
             {tab.label}
             {tab.count !== undefined && tab.count > 0 ? (
-              <span style={badgeStyle(activeTab === tab.id)}>{tab.count}</span>
+              <span className="tab-badge">{tab.count}</span>
             ) : null}
           </button>
         ))}
@@ -426,7 +427,23 @@ export function RFPWorkspace({
                   <h2>Uploaded Files</h2>
                   <p>{sourceFiles.length} original files saved</p>
                 </div>
+                <button
+                  className="ghost-button compact-button"
+                  disabled={isBulkUploading}
+                  onClick={() => bulkSourceInputRef.current?.click()}
+                  type="button"
+                >
+                  {isBulkUploading ? `Saving ${bulkProgress}` : "Bulk Upload"}
+                </button>
               </div>
+              <input
+                accept={FILE_ACCEPT}
+                hidden
+                multiple
+                onChange={(event) => void bulkUploadSources(event.target.files)}
+                ref={bulkSourceInputRef}
+                type="file"
+              />
               <div className="document-list compact-list">
                 {sourceFiles.map((file) => (
                   <article className="document-row" key={file.id}>
@@ -434,7 +451,7 @@ export function RFPWorkspace({
                     <span className="document-main">
                       <span className="document-title">{file.title}</span>
                       <span className="document-meta">
-                        {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
+                        {file.original_filename} · {formatFileMeta(file)} · {formatDate(file.created_at)}
                       </span>
                     </span>
                     <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
@@ -451,13 +468,17 @@ export function RFPWorkspace({
               </div>
             </section>
           </div>
+        </div>
+      )}
 
-          {/* ── 2. What you do: Convert to Markdown ── */}
-          <section className="workspace-section">
+      {/* ══ MARKDOWN ════════════════════════════════════════════════════════ */}
+      {activeTab === "markdown" && (
+        <div className="markdown-tab">
+          <section className="workspace-section markdown-converter-panel">
             <div className="section-heading">
               <div>
                 <h2>Convert to Markdown</h2>
-                <p>Upload a document or paste markdown below</p>
+                <p>Upload a document or paste markdown below.</p>
               </div>
             </div>
             <input
@@ -467,18 +488,11 @@ export function RFPWorkspace({
               ref={sourceInputRef}
               type="file"
             />
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-              <button
-                className="ghost-button compact-button"
-                onClick={() => sourceInputRef.current?.click()}
-                style={{ flexShrink: 0 }}
-                type="button"
-              >
-                {isConverting ? "Converting..." : "↑ Upload File"}
+            <div className="upload-control-row">
+              <button className="button compact-button" onClick={() => sourceInputRef.current?.click()} type="button">
+                {isConverting ? "Converting..." : "Upload File"}
               </button>
-              <span className="document-meta" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {sourceFileName || "DOCX · PDF · XLSX · CSV · MD · TXT"}
-              </span>
+              <span className="document-meta">{sourceFileName || "DOCX · PDF · XLSX · CSV · MD · TXT"}</span>
             </div>
             <input
               className="input"
@@ -515,7 +529,6 @@ export function RFPWorkspace({
             </div>
           </section>
 
-          {/* ── 3. What you've built: Saved Markdown Library ── */}
           <section className="workspace-section source-markdown-section">
             <div className="section-heading">
               <div>
@@ -523,32 +536,36 @@ export function RFPWorkspace({
                 <p>{documentList.length} converted markdown files</p>
               </div>
             </div>
-            <div className="source-markdown-layout">
-              <div className="document-list compact-list source-document-list">
+            <div className="document-list markdown-accordion-list">
                 {documentList.map((document) => (
-                  <article className={`document-row ${activeDocument?.id === document.id ? "active" : ""}`} key={document.id}>
-                    <div className="file-icon">MD</div>
-                    <button className="document-main text-button" onClick={() => setActiveDocument(document)} type="button">
-                      <span className="document-title">{document.title}</span>
-                      <span className="document-meta">
-                        {document.source_type.toUpperCase()} · {formatDate(document.created_at)}
-                      </span>
-                    </button>
-                    <button className="ghost-button compact-button" onClick={() => void removeDocument(document.id)} type="button">
-                      Delete
-                    </button>
+                  <article
+                    className={`document-row markdown-accordion-item ${activeDocument?.id === document.id ? "active" : ""}`}
+                    key={document.id}
+                  >
+                    <div className="markdown-accordion-summary">
+                      <div className="file-icon">MD</div>
+                      <button
+                        className="document-main text-button"
+                        onClick={() => setActiveDocument(activeDocument?.id === document.id ? null : document)}
+                        type="button"
+                      >
+                        <span className="document-title">{document.title}</span>
+                        <span className="document-meta">
+                          {document.source_type.toUpperCase()} · {formatDate(document.created_at)}
+                        </span>
+                      </button>
+                      <button className="ghost-button compact-button" onClick={() => void removeDocument(document.id)} type="button">
+                        Delete
+                      </button>
+                    </div>
+                    {activeDocument?.id === document.id ? (
+                      <pre className="markdown-preview markdown-accordion-preview">{document.markdown}</pre>
+                    ) : null}
                   </article>
                 ))}
-                {documentList.length === 0 ? (
-                  <div className="empty-library">Converted markdown will appear here.</div>
-                ) : null}
-              </div>
-              {activeDocument ? (
-                <pre className="markdown-preview source-markdown-preview">{activeDocument.markdown}</pre>
-              ) : null}
+                {documentList.length === 0 ? <div className="empty-library">Converted markdown will appear here.</div> : null}
             </div>
           </section>
-
         </div>
       )}
 

@@ -27,15 +27,23 @@ export default function RootLayout({
     <html className={`${geistSans.variable} ${geistMono.variable}`} lang="en">
       <body>
         <header className="app-header">
-          <Link className="brand" href="/">
-            <span className="brand-mark">R</span>
-            <span>RFP Manager</span>
-          </Link>
-          <nav aria-label="Primary navigation">
-            <Link href="/">Tracker</Link>
-            <Link href="/convert">Converter</Link>
-            <Link href="/bookmarklet">Import</Link>
-          </nav>
+          <div className="header-left">
+            <Link className="brand" href="/">
+              <span className="brand-mark">R</span>
+              <span>RFP Manager</span>
+            </Link>
+            <label className="global-search">
+              <span aria-hidden="true">⌕</span>
+              <input placeholder="Search proposals, clients..." type="search" />
+            </label>
+          </div>
+          <div className="header-right">
+            <nav aria-label="Primary navigation">
+              <Link href="/">Tracker</Link>
+              <Link href="/convert">Converter</Link>
+              <Link href="/bookmarklet">Import</Link>
+            </nav>
+          </div>
         </header>
         <main>{children}</main>
       </body>

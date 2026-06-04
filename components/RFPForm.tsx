@@ -1,10 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { uploadSourceDocuments } from "@/lib/rfp-source-documents";
 import { createRfp, deleteRfp, updateRfp } from "@/lib/rfps";
 import type { Rfp, RfpInput } from "@/lib/types";
 import { pipelineStages, statuses } from "@/lib/types";
+
+const FILE_ACCEPT =
+  ".docx,.pdf,.xlsx,.csv,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain";
 
 const emptyInput: RfpInput = {
   client_name: "",
@@ -59,7 +63,27 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [sourceFiles, setSourceFiles] = useState<File[]>([]);
+  const [sourceUploadProgress, setSourceUploadProgress] = useState("");
+  const sourceInputRef = useRef<HTMLInputElement>(null);
   const isEditing = Boolean(rfp);
+
+  async function uploadSelectedSources(rfpId: string) {
+    if (sourceFiles.length === 0) {
+      return 0;
+    }
+
+    setSourceUploadProgress(`0/${sourceFiles.length}`);
+    const saved = await uploadSourceDocuments({
+      files: sourceFiles,
+      onProgress: (completed, total) => setSourceUploadProgress(`${completed}/${total}`),
+      rfpId,
+    });
+    setSourceFiles([]);
+    setSourceUploadProgress("");
+    if (sourceInputRef.current) sourceInputRef.current.value = "";
+    return saved.length;
+  }
 
   function setField<K extends keyof RfpInput>(field: K, value: RfpInput[K]) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -102,11 +126,16 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
               summary: form.summary,
               summary_generated_at: form.summary_generated_at,
             });
+      const uploadedSourceCount = await uploadSelectedSources(saved.id);
 
       setForm(inputFromRfp(saved));
 
       if (isEditing) {
-        setNotice("RFP saved.");
+        setNotice(
+          uploadedSourceCount
+            ? `RFP saved with ${uploadedSourceCount} source document${uploadedSourceCount === 1 ? "" : "s"}.`
+            : "RFP saved.",
+        );
         setIsSaving(false);
         router.refresh();
       } else {
@@ -115,6 +144,7 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
       }
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save this RFP.");
+      setSourceUploadProgress("");
       setIsSaving(false);
     }
   }
@@ -138,10 +168,18 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
   }
 
   return (
-    <form className="panel" onSubmit={onSubmit} style={{ padding: 20 }}>
+    <form className="rfp-form" onSubmit={onSubmit}>
       {error ? <div className="notice error">{error}</div> : null}
       {notice ? <div className="notice">{notice}</div> : null}
-      <div className="form-grid">
+      <section className="form-card">
+        <div className="form-card-heading">
+          <h2>
+            <span aria-hidden="true" className="section-icon">i</span>
+            General info
+          </h2>
+          <span className="review-badge">{form.status === "TBD" ? "In review" : form.status}</span>
+        </div>
+        <div className="form-grid">
         <div className="form-field">
           <label htmlFor="client_name">Client Name</label>
           <input
@@ -221,15 +259,17 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
             value={form.gdrive_link ?? ""}
           />
         </div>
-        <div className="form-field full">
-          <label htmlFor="description">Tender Description</label>
-          <textarea
-            className="textarea"
-            id="description"
-            onChange={(event) => setField("description", event.target.value)}
-            value={form.description ?? ""}
-          />
         </div>
+      </section>
+
+      <section className="form-card">
+        <div className="form-card-heading">
+          <h2>
+            <span aria-hidden="true" className="section-icon">□</span>
+            Contact details
+          </h2>
+        </div>
+        <div className="form-grid">
         <div className="form-field">
           <label htmlFor="contact_person">Contact Person</label>
           <input
@@ -259,6 +299,15 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
           />
         </div>
         <div className="form-field full">
+          <label htmlFor="description">Tender Description</label>
+          <textarea
+            className="textarea large-textarea"
+            id="description"
+            onChange={(event) => setField("description", event.target.value)}
+            value={form.description ?? ""}
+          />
+        </div>
+        <div className="form-field full">
           <label htmlFor="notes">Notes</label>
           <textarea
             className="textarea"
@@ -268,9 +317,40 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
           />
         </div>
       </div>
+      </section>
+
+      <section className="form-card">
+      <div className="form-field full source-upload-field">
+        <label htmlFor="rfp-source-upload">Source Documents</label>
+        <input
+          accept={FILE_ACCEPT}
+          hidden
+          id="rfp-source-upload"
+          multiple
+          onChange={(event) => setSourceFiles(Array.from(event.target.files ?? []))}
+          ref={sourceInputRef}
+          type="file"
+        />
+        <div className="inline-upload-control">
+          <button
+            className="ghost-button"
+            disabled={isSaving}
+            onClick={() => sourceInputRef.current?.click()}
+            type="button"
+          >
+            Bulk Upload
+          </button>
+          <span className="document-meta">
+            {sourceFiles.length
+              ? `${sourceFiles.length} file${sourceFiles.length === 1 ? "" : "s"} selected${sourceUploadProgress ? ` · ${sourceUploadProgress}` : ""}`
+              : "DOCX, PDF, XLSX, CSV, Markdown, or TXT"}
+          </span>
+        </div>
+      </div>
+      </section>
       <div className="form-actions">
         <button className="button" disabled={isSaving} type="submit">
-          {isSaving ? "Saving..." : isEditing ? "Save RFP" : "Create RFP"}
+          {isSaving ? (sourceUploadProgress ? `Saving docs ${sourceUploadProgress}` : "Saving...") : isEditing ? "Save RFP" : "Create RFP"}
         </button>
         <button className="ghost-button" onClick={() => router.push("/")} type="button">
           Back

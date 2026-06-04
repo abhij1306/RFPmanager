@@ -28,12 +28,18 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
     workspaceError = loadError instanceof Error ? loadError.message : "Could not load RFP workspace.";
   }
 
+  const [displayTitle, issuedBy] = rfp.client_name.split(/\s+-\s+Issued by\s+/i);
+
   return (
     <div className="shell">
-      <section className="page-title">
+      <section className="project-hero">
         <div>
-          <h1>{rfp.client_name}</h1>
-          <p>Edit links, status, dates, and team notes for this RFP.</p>
+          <h1>{displayTitle}</h1>
+          <p>
+            {[issuedBy ? `Issued by ${issuedBy}` : null, rfp.tender_code ? `Tender ${rfp.tender_code}` : null]
+              .filter(Boolean)
+              .join(" · ") || "Edit links, status, dates, and team notes for this RFP."}
+          </p>
         </div>
       </section>
       {workspaceError ? <div className="notice error">{workspaceError}</div> : null}

@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { closingDateState, isClosingSoon } from "@/lib/date";
+import { uploadSourceDocuments } from "@/lib/rfp-source-documents";
 import { deleteRfp } from "@/lib/rfps";
 import type { Rfp } from "@/lib/types";
 import "./rfp-table.css";
 
 type Filter = "All" | "Active" | "Submitted" | "Closing Soon";
+
+const FILE_ACCEPT =
+  ".docx,.pdf,.xlsx,.csv,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain";
 
 const filters: Filter[] = ["All", "Active", "Submitted", "Closing Soon"];
 
@@ -24,6 +28,59 @@ function applyFilter(rfp: Rfp, filter: Filter): boolean {
   return rfp.pipeline_stage === filter;
 }
 
+function RfpSourceUploadButton({ onUploaded, rfp }: { onUploaded: (count: number) => void; rfp: Rfp }) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [progress, setProgress] = useState("");
+
+  async function upload(files: FileList | null) {
+    const selectedFiles = Array.from(files ?? []);
+    if (selectedFiles.length === 0) return;
+
+    setIsUploading(true);
+    setProgress(`0/${selectedFiles.length}`);
+
+    try {
+      const saved = await uploadSourceDocuments({
+        files: selectedFiles,
+        onProgress: (completed, total) => setProgress(`${completed}/${total}`),
+        rfpId: rfp.id,
+      });
+      onUploaded(saved.length);
+      router.refresh();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Could not bulk upload source documents.");
+    } finally {
+      setIsUploading(false);
+      setProgress("");
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <>
+      <input
+        accept={FILE_ACCEPT}
+        hidden
+        multiple
+        onChange={(event) => void upload(event.target.files)}
+        ref={inputRef}
+        type="file"
+      />
+      <button
+        className="table-upload-button"
+        disabled={isUploading}
+        onClick={() => inputRef.current?.click()}
+        title={`Bulk upload source documents for ${rfp.client_name}`}
+        type="button"
+      >
+        {isUploading ? progress : "Upload"}
+      </button>
+    </>
+  );
+}
+
 export function RFPTable({
   commentCounts,
   documentCounts,
@@ -37,6 +94,7 @@ export function RFPTable({
   const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploadedDocumentCounts, setUploadedDocumentCounts] = useState<Record<string, number>>({});
 
   const filteredRfps = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -152,10 +210,19 @@ export function RFPTable({
                   </td>
                   <td>
                     <Link className="count-link" href={`/rfp/${rfp.id}`}>
-                      {documentCounts[rfp.id] ?? 0}
+                      {(documentCounts[rfp.id] ?? 0) + (uploadedDocumentCounts[rfp.id] ?? 0)}
                     </Link>
                   </td>
                   <td className="action-cell">
+                    <RfpSourceUploadButton
+                      onUploaded={(count) =>
+                        setUploadedDocumentCounts((current) => ({
+                          ...current,
+                          [rfp.id]: (current[rfp.id] ?? 0) + count,
+                        }))
+                      }
+                      rfp={rfp}
+                    />
                     <button
                       aria-label={`Delete ${rfp.client_name}`}
                       className="icon-danger-button"

@@ -48,7 +48,7 @@ table {
 }
 
 .action-column {
-  width: 48px;
+  width: 112px;
 }
 
 th,
@@ -191,9 +191,30 @@ tbody tr:hover {
 }
 
 .action-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   padding: 0 8px;
   overflow: visible;
   text-overflow: clip;
+}
+
+.table-upload-button {
+  display: inline-flex;
+  min-width: 58px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  color: #174ea6;
+  background: var(--accent-soft);
+  border: 1px solid #d2e3fc;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.table-upload-button:hover:not(:disabled) {
+  background: #d2e3fc;
 }
 
 .empty {
