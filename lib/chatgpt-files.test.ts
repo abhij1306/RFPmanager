@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getAllowedFileSourceType,
   normalizeOpenAiFileRefs,
+  validateResponseDraftInput,
   validateSummaryInput,
 } from "@/lib/chatgpt-files";
 
@@ -50,5 +51,16 @@ describe("ChatGPT file helpers", () => {
 
   it("trims GPT-created summaries", () => {
     expect(validateSummaryInput({ summary: "\nKey requirements\n" })).toBe("Key requirements");
+  });
+
+  it("rejects empty GPT-created response drafts", () => {
+    expect(() => validateResponseDraftInput({ title: "Draft", content: "   " })).toThrow("content is required.");
+  });
+
+  it("trims GPT-created response draft fields", () => {
+    expect(validateResponseDraftInput({ title: "\nTender Response Draft\n", content: "\nResponse body\n" })).toEqual({
+      title: "Tender Response Draft",
+      content: "Response body",
+    });
   });
 });

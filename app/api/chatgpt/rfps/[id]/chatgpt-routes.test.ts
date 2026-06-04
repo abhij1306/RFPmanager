@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { GET as getDocuments } from "@/app/api/chatgpt/rfps/[id]/documents/route";
 import { POST as convertDocuments } from "@/app/api/chatgpt/rfps/[id]/documents/convert/route";
 import { GET as getResponses, POST as postResponses } from "@/app/api/chatgpt/rfps/[id]/responses/route";
+import { POST as postResponseText } from "@/app/api/chatgpt/rfps/[id]/responses/text/route";
 import { POST as postSummary } from "@/app/api/chatgpt/rfps/[id]/summary/route";
 
 const originalApiKey = process.env.CHATGPT_ACTIONS_API_KEY;
@@ -45,5 +46,13 @@ describe("new ChatGPT RFP endpoints", () => {
 
     await expect(getResponses(request(), { params })).resolves.toHaveProperty("status", 401);
     await expect(postResponses(request(), { params })).resolves.toHaveProperty("status", 401);
+  });
+
+  it("requires ChatGPT auth for response draft saves", async () => {
+    process.env.CHATGPT_ACTIONS_API_KEY = "secret";
+
+    const response = await postResponseText(request(), { params });
+
+    expect(response.status).toBe(401);
   });
 });

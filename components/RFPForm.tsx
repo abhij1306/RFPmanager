@@ -24,6 +24,9 @@ const emptyInput: RfpInput = {
   document_links: [],
   summary: null,
   summary_generated_at: null,
+  response_draft_title: null,
+  response_draft_content: null,
+  response_draft_saved_at: null,
   notes: null,
   pipeline_stage: "Prospects",
 };
@@ -52,6 +55,9 @@ function inputFromRfp(rfp?: Rfp | null): RfpInput {
     document_links: rfp.document_links,
     summary: rfp.summary,
     summary_generated_at: rfp.summary_generated_at,
+    response_draft_title: rfp.response_draft_title,
+    response_draft_content: rfp.response_draft_content,
+    response_draft_saved_at: rfp.response_draft_saved_at,
     notes: rfp.notes,
     pipeline_stage: rfp.pipeline_stage,
   };
@@ -125,6 +131,9 @@ export function RFPForm({ initialInput, rfp }: { initialInput?: RfpInput; rfp?: 
               document_links: form.document_links,
               summary: form.summary,
               summary_generated_at: form.summary_generated_at,
+              response_draft_title: form.response_draft_title,
+              response_draft_content: form.response_draft_content,
+              response_draft_saved_at: form.response_draft_saved_at,
             });
       const uploadedSourceCount = await uploadSelectedSources(saved.id);
 

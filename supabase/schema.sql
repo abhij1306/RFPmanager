@@ -13,6 +13,9 @@ create table if not exists rfps (
   document_links jsonb not null default '[]'::jsonb,
   summary text,
   summary_generated_at timestamptz,
+  response_draft_title text,
+  response_draft_content text,
+  response_draft_saved_at timestamptz,
   notes text,
   pipeline_stage text not null default 'Prospects' check (pipeline_stage in ('Prospects', 'Active', 'Submitted', 'Won', 'Lost')),
   created_at timestamptz not null default now()
@@ -25,6 +28,9 @@ alter table rfps add column if not exists contact_email text;
 alter table rfps add column if not exists document_links jsonb not null default '[]'::jsonb;
 alter table rfps add column if not exists summary text;
 alter table rfps add column if not exists summary_generated_at timestamptz;
+alter table rfps add column if not exists response_draft_title text;
+alter table rfps add column if not exists response_draft_content text;
+alter table rfps add column if not exists response_draft_saved_at timestamptz;
 
 insert into storage.buckets (id, name, public)
 values ('rfp-files', 'rfp-files', false)

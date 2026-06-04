@@ -18,6 +18,9 @@ const emptyInput: RfpInput = {
   document_links: [],
   summary: null,
   summary_generated_at: null,
+  response_draft_title: null,
+  response_draft_content: null,
+  response_draft_saved_at: null,
   notes: null,
   pipeline_stage: "Prospects",
 };

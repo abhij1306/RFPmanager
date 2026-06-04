@@ -7,10 +7,11 @@ A small team tool for managing RFP opportunities and converting RFP documents in
 - Shared RFP tracker backed by Supabase Postgres.
 - Add, edit, delete, filter, and open linked tender or Google Drive records.
 - Save comments and converted Markdown documents against each RFP.
-- Save original uploaded tender files and generated response files against each RFP.
+- Save original uploaded tender files, editable response drafts, and generated response files against each RFP.
 - Client-side DOCX/PDF/Excel/CSV to Markdown converter.
 - Browser bookmarklet for importing tender details and document links from tender pages.
 - Groq-powered summary generation from saved Markdown.
+- ChatGPT Actions endpoints for saving summaries, response drafts, documents, and response files.
 - Vercel-ready Next.js App Router project.
 
 ## Local Setup
@@ -54,7 +55,7 @@ PPTX conversion is not currently supported. If PPTX support is added through a s
 
 Create a Supabase project and run [supabase/schema.sql](supabase/schema.sql) in the SQL editor. Re-run the same schema after pulling updates; it creates the RFP, saved Markdown document, and comment tables if they do not already exist.
 
-The schema also creates a private Supabase Storage bucket named `rfp-files` for original tender documents and response files.
+The schema also adds editable response draft fields to RFP records and creates a private Supabase Storage bucket named `rfp-files` for original tender documents and response files.
 
 The schema enables Row Level Security and allows anonymous team access for this private shared app. Anyone with the deployed URL and anon key can read and write RFPs, comments, saved Markdown, original files, and response files, so share the URL only with your team.
 
@@ -78,6 +79,7 @@ Use this when you want team members to use one shared Custom GPT that can read a
   - `POST /api/chatgpt/rfps/{id}/summary`
   - `GET /api/chatgpt/rfps/{id}/responses`
   - `POST /api/chatgpt/rfps/{id}/responses`
+  - `POST /api/chatgpt/rfps/{id}/responses/text`
 - An OpenAPI Actions schema based on [docs/chatgpt-actions-openapi.yaml](docs/chatgpt-actions-openapi.yaml).
 
 Team members do not create their own GPTs. They use the shared GPT.
@@ -131,11 +133,11 @@ Generate summaries yourself after reviewing the available saved Markdown. Then u
 
 When the user uploads tender documents in ChatGPT, first identify the target RFP. Then use convertAndSaveRfpDocuments to save the original files and converted Markdown. After conversion, use listRfpDocuments and getRfpDocumentMarkdown if analysis is requested.
 
-When creating proposal response files, generate the files first, then use saveRfpResponses so they are stored against the correct RFP.
+When creating editable proposal response draft text, generate the draft content and then use saveRfpResponseDraft so it is stored against the correct RFP. When creating proposal response files such as DOCX, PDF, or XLSX outputs, generate the files first, then use saveRfpResponses so they are stored against the correct RFP.
 
 Do not invent RFP records, deadlines, tender codes, links, contacts, notes, summaries, evaluation criteria, statuses, or bid decisions. If information is not available, say it is not recorded. If no matching RFP exists, say RFPmanager has no matching record and ask for a client name, tender code, or other human-readable identifier.
 
-Keep responses concise and practical. After creating or updating an RFP, summarize the fields saved, mention important missing fields, and highlight upcoming deadlines when relevant. After saving summaries, documents, or response files, confirm what was saved and which RFP it was saved against.
+Keep responses concise and practical. After creating or updating an RFP, summarize the fields saved, mention important missing fields, and highlight upcoming deadlines when relevant. After saving summaries, documents, response drafts, or response files, confirm what was saved and which RFP it was saved against.
 ```
 
 ### 4. Current Security Note

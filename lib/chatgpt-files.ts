@@ -75,3 +75,20 @@ export function validateSummaryInput(payload: unknown): string {
 
   return summary.trim();
 }
+
+export function validateResponseDraftInput(payload: unknown): { title: string; content: string } {
+  const draft = payload as { title?: unknown; content?: unknown };
+
+  if (typeof draft.title !== "string" || !draft.title.trim()) {
+    throw new Error("title is required.");
+  }
+
+  if (typeof draft.content !== "string" || !draft.content.trim()) {
+    throw new Error("content is required.");
+  }
+
+  return {
+    title: draft.title.trim(),
+    content: draft.content.trim(),
+  };
+}

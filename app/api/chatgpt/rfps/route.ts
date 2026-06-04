@@ -6,7 +6,7 @@ import { normalizeImportedRfp } from "@/lib/rfps";
 import type { Rfp, RfpImportInput } from "@/lib/types";
 
 const selectFields =
-  "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, contact_person, contact_phone, contact_email, document_links, summary, summary_generated_at, notes, pipeline_stage, created_at";
+  "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, contact_person, contact_phone, contact_email, document_links, summary, summary_generated_at, response_draft_title, response_draft_content, response_draft_saved_at, notes, pipeline_stage, created_at";
 
 export const dynamic = "force-dynamic";
 

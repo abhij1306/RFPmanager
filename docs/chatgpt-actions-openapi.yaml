@@ -409,6 +409,54 @@ paths:
                     items:
                       $ref: "#/components/schemas/RfpFile"
 
+  /api/chatgpt/rfps/{id}/responses/text:
+    post:
+      operationId: saveRfpResponseDraft
+      summary: Save a GPT-created editable response draft for one RFP
+      description: >
+        Use this after the GPT creates proposal response text that should be saved
+        directly as editable draft content in RFPmanager. Use saveRfpResponses
+        only when attaching generated files such as DOCX, PDF, or XLSX outputs.
+      x-openai-isConsequential: true
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The UUID of the RFP record.
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - title
+                - content
+              properties:
+                title:
+                  type: string
+                  description: Short title for the response draft.
+                content:
+                  type: string
+                  description: Complete proposal response draft text to save against the RFP.
+      responses:
+        "200":
+          description: Updated RFP with saved response draft.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  rfp:
+                    $ref: "#/components/schemas/Rfp"
+                  response_draft:
+                    $ref: "#/components/schemas/RfpResponseDraft"
+
 components:
   securitySchemes:
     chatgptActionsApiKey:
@@ -460,6 +508,12 @@ components:
           type: ["string", "null"]
         summary:
           type: ["string", "null"]
+        response_draft_title:
+          type: ["string", "null"]
+        response_draft_content:
+          type: ["string", "null"]
+        response_draft_saved_at:
+          type: ["string", "null"]
         notes:
           type: ["string", "null"]
         pipeline_stage:
@@ -483,6 +537,17 @@ components:
           maxItems: 10
           items:
             type: string
+
+    RfpResponseDraft:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: ["string", "null"]
+        content:
+          type: ["string", "null"]
+        saved_at:
+          type: ["string", "null"]
 
     RfpDocument:
       type: object

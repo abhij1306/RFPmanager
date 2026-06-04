@@ -16,6 +16,9 @@ export type Rfp = {
   document_links: TenderDocumentLink[];
   summary: string | null;
   summary_generated_at: string | null;
+  response_draft_title: string | null;
+  response_draft_content: string | null;
+  response_draft_saved_at: string | null;
   notes: string | null;
   pipeline_stage: PipelineStage;
   created_at: string;
@@ -35,6 +38,9 @@ export type RfpInput = {
   document_links: TenderDocumentLink[];
   summary: string | null;
   summary_generated_at: string | null;
+  response_draft_title: string | null;
+  response_draft_content: string | null;
+  response_draft_saved_at: string | null;
   notes: string | null;
   pipeline_stage: PipelineStage;
 };

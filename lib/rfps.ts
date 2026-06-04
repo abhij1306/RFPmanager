@@ -2,7 +2,7 @@ import { getSupabase } from "@/lib/supabase";
 import type { Rfp, RfpImportInput, RfpInput, TenderDocumentLink } from "@/lib/types";
 
 const selectFields =
-  "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, contact_person, contact_phone, contact_email, document_links, summary, summary_generated_at, notes, pipeline_stage, created_at";
+  "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, contact_person, contact_phone, contact_email, document_links, summary, summary_generated_at, response_draft_title, response_draft_content, response_draft_saved_at, notes, pipeline_stage, created_at";
 const legacySelectFields = "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, notes, pipeline_stage, created_at";
 
 function withRfpDefaults(rfp: Partial<Rfp>): Rfp {
@@ -21,6 +21,9 @@ function withRfpDefaults(rfp: Partial<Rfp>): Rfp {
     document_links: normalizeDocumentLinks(rfp.document_links),
     summary: rfp.summary ?? null,
     summary_generated_at: rfp.summary_generated_at ?? null,
+    response_draft_title: rfp.response_draft_title ?? null,
+    response_draft_content: rfp.response_draft_content ?? null,
+    response_draft_saved_at: rfp.response_draft_saved_at ?? null,
     notes: rfp.notes ?? null,
     pipeline_stage: rfp.pipeline_stage ?? "Prospects",
     created_at: rfp.created_at ?? new Date(0).toISOString(),
@@ -100,6 +103,9 @@ export function normalizeImportedRfp(input: RfpImportInput): RfpInput {
     document_links: normalizeDocumentLinks(input.document_links),
     summary: input.summary ?? null,
     summary_generated_at: input.summary_generated_at ?? null,
+    response_draft_title: input.response_draft_title ?? null,
+    response_draft_content: input.response_draft_content ?? null,
+    response_draft_saved_at: input.response_draft_saved_at ?? null,
     notes: input.notes ?? null,
     pipeline_stage: input.pipeline_stage ?? "Prospects",
   };
@@ -193,6 +199,26 @@ export async function updateRfpSummary(id: string, summary: string): Promise<Rfp
   const { data, error } = await supabase
     .from("rfps")
     .update({ summary, summary_generated_at: new Date().toISOString() })
+    .eq("id", id)
+    .select(selectFields)
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateRfpResponseDraft(id: string, title: string, content: string): Promise<Rfp> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("rfps")
+    .update({
+      response_draft_title: title,
+      response_draft_content: content,
+      response_draft_saved_at: new Date().toISOString(),
+    })
     .eq("id", id)
     .select(selectFields)
     .single();
