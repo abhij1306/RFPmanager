@@ -72,6 +72,7 @@ export function RFPWorkspace({
   const responseInputRef = useRef<HTMLInputElement>(null);
   const sourceFiles = fileList.filter((file) => file.kind === "source");
   const responseFiles = fileList.filter((file) => file.kind === "response");
+  const hasResponseDraft = Boolean(rfp.response_draft_content?.trim());
 
   // ── Handlers (unchanged) ──────────────────────────────────────────────────
   async function handleFiles(files: FileList | null) {
@@ -575,7 +576,9 @@ export function RFPWorkspace({
           <div className="section-heading">
             <div>
               <h2>Responses</h2>
-              <p>{responseFiles.length} response files saved</p>
+              <p>
+                {hasResponseDraft ? "1 draft" : "No draft"} · {responseFiles.length} response files saved
+              </p>
             </div>
             <button
               className="ghost-button compact-button"
@@ -599,6 +602,19 @@ export function RFPWorkspace({
             value={responseNotes}
           />
           <div className="document-list compact-list">
+            {hasResponseDraft ? (
+              <article className="document-row">
+                <div className="file-icon">TXT</div>
+                <span className="document-main">
+                  <span className="document-title">{rfp.response_draft_title ?? "Response Draft"}</span>
+                  <span className="document-meta">
+                    Draft text
+                    {rfp.response_draft_saved_at ? ` · Saved ${formatDate(rfp.response_draft_saved_at)}` : ""}
+                  </span>
+                  <pre className="markdown-preview document-preview">{rfp.response_draft_content}</pre>
+                </span>
+              </article>
+            ) : null}
             {responseFiles.map((file) => (
               <article className="document-row" key={file.id}>
                 <div className="file-icon">RSP</div>
@@ -616,8 +632,8 @@ export function RFPWorkspace({
                 </button>
               </article>
             ))}
-            {responseFiles.length === 0 ? (
-              <div className="empty-library">Response files will appear here.</div>
+            {!hasResponseDraft && responseFiles.length === 0 ? (
+              <div className="empty-library">Response drafts and files will appear here.</div>
             ) : null}
           </div>
         </section>
