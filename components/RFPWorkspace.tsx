@@ -74,7 +74,7 @@ export function RFPWorkspace({
   const responseFiles = fileList.filter((file) => file.kind === "response");
   const hasResponseDraft = Boolean(rfp.response_draft_content?.trim());
 
-  // ── Handlers (unchanged) ──────────────────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────────
   async function handleFiles(files: FileList | null) {
     const file = files?.[0];
     if (!file) return;
@@ -355,7 +355,6 @@ export function RFPWorkspace({
         <div className={`notice ${messageType === "error" ? "error" : ""}`}>{message}</div>
       ) : null}
 
-      {/* ── Tab bar ── */}
       <nav className="workspace-tabs">
         {tabs.map((tab) => (
           <button
@@ -524,7 +523,7 @@ export function RFPWorkspace({
               placeholder="Paste markdown here, or upload a file above to auto-convert."
               value={markdownDraft}
             />
-            <div className="form-actions flush-actions">
+            <div className="form-actions">
               <button
                 className="button"
                 disabled={!markdownDraft.trim() || isSavingMarkdown}
@@ -658,8 +657,7 @@ export function RFPWorkspace({
         </section>
       )}
 
-      {/* ══ TEAM ═════════════════════════════════════════════════════════════
-          Comments                                                             */}
+      {/* ══ TEAM ═════════════════════════════════════════════════════════════ */}
       {activeTab === "team" && (
         <section className="workspace-section">
           <div className="section-heading">
