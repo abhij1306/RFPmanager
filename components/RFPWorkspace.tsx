@@ -7,6 +7,11 @@ import { createDocument, deleteDocument } from "@/lib/documents";
 import { createRfpFileDownloadUrl, deleteRfpFile, uploadRfpFile } from "@/lib/rfp-files";
 import type { Rfp, RfpComment, RfpDocument, RfpDocumentSourceType, RfpFile } from "@/lib/types";
 
+type WorkspaceTab = "summary" | "sources" | "response" | "team";
+
+const FILE_ACCEPT =
+  ".docx,.pdf,.xlsx,.csv,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain";
+
 function formatDate(value: string): string {
   return new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
@@ -14,6 +19,48 @@ function formatDate(value: string): string {
 function combineDocumentMarkdown(documents: RfpDocument[]): string {
   return documents.map((document) => `# ${document.title}\n\n${document.markdown}`).join("\n\n");
 }
+
+// ─── Tab nav styles ───────────────────────────────────────────────────────────
+const tabNavStyle: React.CSSProperties = {
+  display: "flex",
+  padding: 3,
+  border: "1px solid var(--line)",
+  borderRadius: 8,
+  background: "var(--soft)",
+  flexShrink: 0,
+};
+
+function tabStyle(active: boolean): React.CSSProperties {
+  return {
+    display: "flex",
+    alignItems: "center",
+    gap: 5,
+    padding: "10px 13px",
+    fontSize: 11,
+    fontWeight: 600,
+    letterSpacing: "0.07em",
+    textTransform: "uppercase",
+    border: "none",
+    borderRadius: 6,
+    background: active ? "var(--accent-soft)" : "transparent",
+    color: active ? "#174ea6" : "var(--muted)",
+    cursor: "pointer",
+    transition: "color 0.12s, background-color 0.12s",
+    whiteSpace: "nowrap",
+  };
+}
+
+function badgeStyle(active: boolean): React.CSSProperties {
+  return {
+    fontSize: 10,
+    padding: "1px 5px",
+    borderRadius: 9999,
+    fontFamily: "var(--font-mono, monospace)",
+    background: active ? "#d2e3fc" : "var(--surface)",
+    color: active ? "#174ea6" : "var(--muted)",
+  };
+}
+// ─────────────────────────────────────────────────────────────────────────────
 
 export function RFPWorkspace({
   comments,
@@ -26,6 +73,7 @@ export function RFPWorkspace({
   files: RfpFile[];
   rfp: Rfp;
 }) {
+  // ── State ─────────────────────────────────────────────────────────────────
   const [commentList, setCommentList] = useState(comments);
   const [documentList, setDocumentList] = useState(documents);
   const [fileList, setFileList] = useState(files);
@@ -46,16 +94,17 @@ export function RFPWorkspace({
   const [isUploadingResponse, setIsUploadingResponse] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("summary");
+
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const responseInputRef = useRef<HTMLInputElement>(null);
   const sourceFiles = fileList.filter((file) => file.kind === "source");
   const responseFiles = fileList.filter((file) => file.kind === "response");
 
+  // ── Handlers (unchanged) ──────────────────────────────────────────────────
   async function handleFiles(files: FileList | null) {
     const file = files?.[0];
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     setIsConverting(true);
     setMessage(null);
@@ -81,9 +130,7 @@ export function RFPWorkspace({
 
   async function addComment() {
     const body = commentBody.trim();
-    if (!body) {
-      return;
-    }
+    if (!body) return;
 
     setIsPosting(true);
     setMessage(null);
@@ -104,7 +151,6 @@ export function RFPWorkspace({
   async function removeComment(id: string) {
     setMessage(null);
     setMessageType("info");
-
     try {
       await deleteComment(id);
       setCommentList((current) => current.filter((comment) => comment.id !== id));
@@ -115,19 +161,13 @@ export function RFPWorkspace({
   }
 
   async function removeDocument(id: string) {
-    if (!window.confirm("Delete this saved markdown?")) {
-      return;
-    }
-
+    if (!window.confirm("Delete this saved markdown?")) return;
     setMessage(null);
     setMessageType("info");
-
     try {
       await deleteDocument(id);
       setDocumentList((current) => current.filter((document) => document.id !== id));
-      if (activeDocument?.id === id) {
-        setActiveDocument(null);
-      }
+      if (activeDocument?.id === id) setActiveDocument(null);
     } catch (error) {
       setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not delete saved markdown.");
@@ -137,7 +177,6 @@ export function RFPWorkspace({
   async function downloadFile(file: RfpFile) {
     setMessage(null);
     setMessageType("info");
-
     try {
       const url = await createRfpFileDownloadUrl(file);
       window.open(url, "_blank", "noopener,noreferrer");
@@ -148,13 +187,9 @@ export function RFPWorkspace({
   }
 
   async function removeFile(file: RfpFile) {
-    if (!window.confirm(`Delete ${file.original_filename}?`)) {
-      return;
-    }
-
+    if (!window.confirm(`Delete ${file.original_filename}?`)) return;
     setMessage(null);
     setMessageType("info");
-
     try {
       await deleteRfpFile(file);
       setFileList((current) => current.filter((item) => item.id !== file.id));
@@ -167,9 +202,7 @@ export function RFPWorkspace({
 
   async function uploadResponse(files: FileList | null) {
     const file = files?.[0];
-    if (!file) {
-      return;
-    }
+    if (!file) return;
 
     setIsUploadingResponse(true);
     setMessage(null);
@@ -189,9 +222,7 @@ export function RFPWorkspace({
       setFileList((current) => [saved, ...current]);
       setResponseNotes("");
       setMessage("Response file saved.");
-      if (responseInputRef.current) {
-        responseInputRef.current.value = "";
-      }
+      if (responseInputRef.current) responseInputRef.current.value = "";
     } catch (error) {
       setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not save response file.");
@@ -202,17 +233,14 @@ export function RFPWorkspace({
 
   async function generateSummary(documentsToSummarize = documentList) {
     const markdown = combineDocumentMarkdown(documentsToSummarize);
-
     if (!markdown.trim()) {
       setMessageType("error");
       setMessage("Save converted markdown before generating a summary.");
       return;
     }
-
     setIsSummarizing(true);
     setMessage(null);
     setMessageType("info");
-
     try {
       const response = await fetch("/api/summarize", {
         method: "POST",
@@ -220,11 +248,7 @@ export function RFPWorkspace({
         body: JSON.stringify({ rfp_id: rfp.id, markdown }),
       });
       const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error ?? "Could not generate summary.");
-      }
-
+      if (!response.ok) throw new Error(data.error ?? "Could not generate summary.");
       setSummary(data.summary);
       setSummaryGeneratedAt(data.rfp?.summary_generated_at ?? new Date().toISOString());
       setMessageType("info");
@@ -239,20 +263,16 @@ export function RFPWorkspace({
 
   async function saveMarkdown(generateAfterSave = false) {
     const markdown = markdownDraft.trim();
-
     if (!markdown) {
       setMessageType("error");
       setMessage("Add or upload markdown before saving.");
       return;
     }
-
     setIsSavingMarkdown(true);
     setMessage(null);
     setMessageType("info");
-
     try {
       let sourceFileId: string | null = null;
-
       if (sourceFile) {
         const savedSourceFile = await uploadRfpFile({
           body: sourceFile,
@@ -266,7 +286,6 @@ export function RFPWorkspace({
         sourceFileId = savedSourceFile.id;
         setFileList((current) => [savedSourceFile, ...current]);
       }
-
       const saved = await createDocument({
         rfp_id: rfp.id,
         source_file_id: sourceFileId,
@@ -283,14 +302,9 @@ export function RFPWorkspace({
       setSourceFileName("");
       setSourceFile(null);
       setSourceType("markdown");
-      if (sourceInputRef.current) {
-        sourceInputRef.current.value = "";
-      }
+      if (sourceInputRef.current) sourceInputRef.current.value = "";
       setMessage(generateAfterSave ? "Markdown saved. Generating summary..." : "Markdown saved to this RFP.");
-
-      if (generateAfterSave) {
-        await generateSummary(nextDocuments);
-      }
+      if (generateAfterSave) await generateSummary(nextDocuments);
     } catch (error) {
       setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not save markdown.");
@@ -299,236 +313,343 @@ export function RFPWorkspace({
     }
   }
 
+  // ── Tab config ────────────────────────────────────────────────────────────
+  const tabs: { id: WorkspaceTab; label: string; count?: number }[] = [
+    { id: "summary", label: "Summary" },
+    { id: "sources", label: "Sources", count: sourceFiles.length + rfp.document_links.length },
+    { id: "response", label: "Response", count: responseFiles.length + documentList.length },
+    { id: "team", label: "Team", count: commentList.length },
+  ];
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <aside className="workspace-panel">
-      {message ? <div className={`notice ${messageType === "error" ? "error" : ""}`}>{message}</div> : null}
+      {/* Global status banner */}
+      {message ? (
+        <div className={`notice ${messageType === "error" ? "error" : ""}`}>{message}</div>
+      ) : null}
 
-      <section className="workspace-section">
-        <div className="section-heading">
-          <div>
-            <h2>Summary</h2>
-            <p>{summaryGeneratedAt ? `Autosaved ${formatDate(summaryGeneratedAt)}` : "Generate from saved markdown"}</p>
-          </div>
-          <button className="button compact-button" disabled={isSummarizing} onClick={() => void generateSummary()} type="button">
-            {isSummarizing ? "Generating..." : "Generate"}
-          </button>
-        </div>
-        {summary ? <pre className="markdown-preview document-preview">{summary}</pre> : <div className="empty-library">No summary generated yet.</div>}
-      </section>
-
-      <section className="workspace-section">
-        <div className="section-heading">
-          <div>
-            <h2>Add Markdown</h2>
-            <p>{sourceFileName || "Upload a source file or paste markdown for this RFP"}</p>
-          </div>
-          <button className="ghost-button compact-button" onClick={() => sourceInputRef.current?.click()} type="button">
-            {isConverting ? "Converting..." : "Upload"}
-          </button>
-        </div>
-        <input
-          accept=".docx,.pdf,.xlsx,.csv,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain"
-          hidden
-          onChange={(event) => void handleFiles(event.target.files)}
-          ref={sourceInputRef}
-          type="file"
-        />
-        <input
-          className="input"
-          onChange={(event) => setMarkdownTitle(event.target.value)}
-          placeholder="Markdown title"
-          value={markdownTitle}
-        />
-        <textarea
-          className="textarea markdown-draft"
-          onChange={(event) => {
-            setMarkdownDraft(event.target.value);
-            if (!sourceFileName) {
-              setSourceType("markdown");
-            }
-          }}
-          placeholder="Paste markdown here, or upload DOCX, PDF, XLSX, CSV, MD, Markdown, or TXT."
-          value={markdownDraft}
-        />
-        <div className="form-actions flush-actions">
+      {/* ── Tab bar ── */}
+      <nav style={tabNavStyle}>
+        {tabs.map((tab) => (
           <button
-            className="button"
-            disabled={!markdownDraft.trim() || isSavingMarkdown}
-            onClick={() => void saveMarkdown(false)}
+            key={tab.id}
             type="button"
+            style={tabStyle(activeTab === tab.id)}
+            onClick={() => setActiveTab(tab.id)}
+            onMouseEnter={(e) => {
+              if (activeTab !== tab.id)
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--text)";
+            }}
+            onMouseLeave={(e) => {
+              if (activeTab !== tab.id)
+                (e.currentTarget as HTMLButtonElement).style.color = "var(--muted)";
+            }}
           >
-            {isSavingMarkdown ? "Saving..." : "Save Markdown"}
+            {tab.label}
+            {tab.count !== undefined && tab.count > 0 ? (
+              <span style={badgeStyle(activeTab === tab.id)}>{tab.count}</span>
+            ) : null}
           </button>
-          <button
-            className="ghost-button"
-            disabled={!markdownDraft.trim() || isSavingMarkdown || isSummarizing}
-            onClick={() => void saveMarkdown(true)}
-            type="button"
-          >
-            Save & Generate
-          </button>
-        </div>
-      </section>
+        ))}
+      </nav>
 
-      <section className="workspace-section">
-        <div className="section-heading">
-          <div>
-            <h2>Source Documents</h2>
-            <p>{sourceFiles.length} original files saved</p>
+      {/* ══ SUMMARY ══════════════════════════════════════════════════════════ */}
+      {activeTab === "summary" && (
+        <section className="workspace-section">
+          <div className="section-heading">
+            <div>
+              <h2>Summary</h2>
+              <p>
+                {summaryGeneratedAt
+                  ? `Autosaved ${formatDate(summaryGeneratedAt)}`
+                  : "Generate from saved markdown"}
+              </p>
+            </div>
+            <button
+              className="button compact-button"
+              disabled={isSummarizing}
+              onClick={() => void generateSummary()}
+              type="button"
+            >
+              {isSummarizing ? "Generating..." : "Generate"}
+            </button>
           </div>
-        </div>
-        <div className="document-list compact-list">
-          {sourceFiles.map((file) => (
-            <article className="document-row" key={file.id}>
-              <div className="file-icon">SRC</div>
-              <span className="document-main">
-                <span className="document-title">{file.title}</span>
-                <span className="document-meta">
-                  {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
-                </span>
-              </span>
-              <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
-                Download
-              </button>
-              <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
-                Delete
-              </button>
-            </article>
-          ))}
-          {sourceFiles.length === 0 ? <div className="empty-library">Original uploaded documents will appear here.</div> : null}
-        </div>
-      </section>
+          {summary ? (
+            <pre className="markdown-preview document-preview">{summary}</pre>
+          ) : (
+            <div className="empty-library">No summary generated yet.</div>
+          )}
+        </section>
+      )}
 
-      <section className="workspace-section">
-        <div className="section-heading">
-          <div>
-            <h2>Responses</h2>
-            <p>{responseFiles.length} response files saved</p>
-          </div>
-          <button className="ghost-button compact-button" onClick={() => responseInputRef.current?.click()} type="button">
-            {isUploadingResponse ? "Uploading..." : "Upload"}
-          </button>
-        </div>
-        <input
-          accept=".docx,.pdf,.xlsx,.csv,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain"
-          hidden
-          onChange={(event) => void uploadResponse(event.target.files)}
-          ref={responseInputRef}
-          type="file"
-        />
-        <textarea
-          className="textarea compact-textarea"
-          onChange={(event) => setResponseNotes(event.target.value)}
-          placeholder="Optional response notes"
-          value={responseNotes}
-        />
-        <div className="document-list compact-list">
-          {responseFiles.map((file) => (
-            <article className="document-row" key={file.id}>
-              <div className="file-icon">RSP</div>
-              <span className="document-main">
-                <span className="document-title">{file.title}</span>
-                <span className="document-meta">
-                  {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
-                </span>
-              </span>
-              <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
-                Download
-              </button>
-              <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
-                Delete
-              </button>
-            </article>
-          ))}
-          {responseFiles.length === 0 ? <div className="empty-library">Response files will appear here.</div> : null}
-        </div>
-      </section>
-
-      <section className="workspace-section">
-        <div className="section-heading">
-          <div>
-            <h2>Tender Links</h2>
-            <p>{rfp.document_links.length} imported document URLs</p>
-          </div>
-        </div>
-        <div className="document-list compact-list">
-          {rfp.document_links.map((link) => (
-            <a className="document-row" href={link.url} key={`${link.name}-${link.url}`} rel="noreferrer" target="_blank">
-              <div className="file-icon">URL</div>
-              <span className="document-main">
-                <span className="document-title">{link.name || link.url}</span>
-                <span className="document-meta">{link.url}</span>
-              </span>
-            </a>
-          ))}
-          {rfp.document_links.length === 0 ? <div className="empty-library">Imported tender document links will appear here.</div> : null}
-        </div>
-      </section>
-
-      <section className="workspace-section">
-        <div className="section-heading">
-          <div>
-            <h2>Documents</h2>
-            <p>{documentList.length} saved markdown files</p>
-          </div>
-        </div>
-        <div className="document-list compact-list">
-          {documentList.map((document) => (
-            <article className={`document-row ${activeDocument?.id === document.id ? "active" : ""}`} key={document.id}>
-              <div className="file-icon">MD</div>
-              <button className="document-main text-button" onClick={() => setActiveDocument(document)} type="button">
-                <span className="document-title">{document.title}</span>
-                <span className="document-meta">
-                  {document.source_type.toUpperCase()} · {formatDate(document.created_at)}
-                </span>
-              </button>
-              <button className="ghost-button compact-button" onClick={() => void removeDocument(document.id)} type="button">
-                Delete
-              </button>
-            </article>
-          ))}
-          {documentList.length === 0 ? <div className="empty-library">No markdown saved for this RFP yet.</div> : null}
-        </div>
-        {activeDocument ? (
-          <pre className="markdown-preview document-preview">{activeDocument.markdown}</pre>
-        ) : null}
-      </section>
-
-      <section className="workspace-section">
-        <div className="section-heading">
-          <div>
-            <h2>Comments</h2>
-            <p>{commentList.length} notes from the team</p>
-          </div>
-        </div>
-        <textarea
-          className="textarea"
-          onChange={(event) => setCommentBody(event.target.value)}
-          placeholder="Add a comment or follow-up note"
-          value={commentBody}
-        />
-        <div className="form-actions flush-actions">
-          <button className="button" disabled={!commentBody.trim() || isPosting} onClick={() => void addComment()} type="button">
-            {isPosting ? "Posting..." : "Add Comment"}
-          </button>
-        </div>
-        <div className="comment-list">
-          {commentList.map((comment) => (
-            <article className="comment-row" key={comment.id}>
+      {/* ══ SOURCES ══════════════════════════════════════════════════════════
+          Add Markdown · Source Documents · Tender Links                       */}
+      {activeTab === "sources" && (
+        <>
+          <section className="workspace-section">
+            <div className="section-heading">
               <div>
-                <div className="comment-meta">
-                  {comment.author_name} · {formatDate(comment.created_at)}
-                </div>
-                <p>{comment.body}</p>
+                <h2>Add Markdown</h2>
+                <p>{sourceFileName || "Upload a file or paste markdown"}</p>
               </div>
-              <button className="text-danger" onClick={() => void removeComment(comment.id)} type="button">
-                Delete
+              <button
+                className="ghost-button compact-button"
+                onClick={() => sourceInputRef.current?.click()}
+                type="button"
+              >
+                {isConverting ? "Converting..." : "Upload"}
               </button>
-            </article>
-          ))}
-          {commentList.length === 0 ? <div className="empty-library">Comments will appear here.</div> : null}
-        </div>
-      </section>
+            </div>
+            <input
+              accept={FILE_ACCEPT}
+              hidden
+              onChange={(event) => void handleFiles(event.target.files)}
+              ref={sourceInputRef}
+              type="file"
+            />
+            <input
+              className="input"
+              onChange={(event) => setMarkdownTitle(event.target.value)}
+              placeholder="Markdown title"
+              value={markdownTitle}
+            />
+            <textarea
+              className="textarea markdown-draft"
+              onChange={(event) => {
+                setMarkdownDraft(event.target.value);
+                if (!sourceFileName) setSourceType("markdown");
+              }}
+              placeholder="Paste markdown here, or upload DOCX, PDF, XLSX, CSV, MD, or TXT."
+              value={markdownDraft}
+            />
+            <div className="form-actions flush-actions">
+              <button
+                className="button"
+                disabled={!markdownDraft.trim() || isSavingMarkdown}
+                onClick={() => void saveMarkdown(false)}
+                type="button"
+              >
+                {isSavingMarkdown ? "Saving..." : "Save Markdown"}
+              </button>
+              <button
+                className="ghost-button"
+                disabled={!markdownDraft.trim() || isSavingMarkdown || isSummarizing}
+                onClick={() => void saveMarkdown(true)}
+                type="button"
+              >
+                Save & Generate
+              </button>
+            </div>
+          </section>
+
+          <section className="workspace-section">
+            <div className="section-heading">
+              <div>
+                <h2>Source Documents</h2>
+                <p>{sourceFiles.length} original files saved</p>
+              </div>
+            </div>
+            <div className="document-list compact-list">
+              {sourceFiles.map((file) => (
+                <article className="document-row" key={file.id}>
+                  <div className="file-icon">SRC</div>
+                  <span className="document-main">
+                    <span className="document-title">{file.title}</span>
+                    <span className="document-meta">
+                      {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
+                    </span>
+                  </span>
+                  <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
+                    Download
+                  </button>
+                  <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
+                    Delete
+                  </button>
+                </article>
+              ))}
+              {sourceFiles.length === 0 ? (
+                <div className="empty-library">Original uploaded documents will appear here.</div>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="workspace-section">
+            <div className="section-heading">
+              <div>
+                <h2>Tender Links</h2>
+                <p>{rfp.document_links.length} imported document URLs</p>
+              </div>
+            </div>
+            <div className="document-list compact-list">
+              {rfp.document_links.map((link) => (
+                <a
+                  className="document-row"
+                  href={link.url}
+                  key={`${link.name}-${link.url}`}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  <div className="file-icon">URL</div>
+                  <span className="document-main">
+                    <span className="document-title">{link.name || link.url}</span>
+                    <span className="document-meta">{link.url}</span>
+                  </span>
+                </a>
+              ))}
+              {rfp.document_links.length === 0 ? (
+                <div className="empty-library">Imported tender document links will appear here.</div>
+              ) : null}
+            </div>
+          </section>
+        </>
+      )}
+
+      {/* ══ RESPONSE ═════════════════════════════════════════════════════════
+          Saved Markdown Documents · Response Files                            */}
+      {activeTab === "response" && (
+        <>
+          <section className="workspace-section">
+            <div className="section-heading">
+              <div>
+                <h2>Documents</h2>
+                <p>{documentList.length} saved markdown files</p>
+              </div>
+            </div>
+            <div className="document-list compact-list">
+              {documentList.map((document) => (
+                <article
+                  className={`document-row ${activeDocument?.id === document.id ? "active" : ""}`}
+                  key={document.id}
+                >
+                  <div className="file-icon">MD</div>
+                  <button
+                    className="document-main text-button"
+                    onClick={() => setActiveDocument(document)}
+                    type="button"
+                  >
+                    <span className="document-title">{document.title}</span>
+                    <span className="document-meta">
+                      {document.source_type.toUpperCase()} · {formatDate(document.created_at)}
+                    </span>
+                  </button>
+                  <button
+                    className="ghost-button compact-button"
+                    onClick={() => void removeDocument(document.id)}
+                    type="button"
+                  >
+                    Delete
+                  </button>
+                </article>
+              ))}
+              {documentList.length === 0 ? (
+                <div className="empty-library">No markdown saved for this RFP yet.</div>
+              ) : null}
+            </div>
+            {activeDocument ? (
+              <pre className="markdown-preview document-preview">{activeDocument.markdown}</pre>
+            ) : null}
+          </section>
+
+          <section className="workspace-section">
+            <div className="section-heading">
+              <div>
+                <h2>Responses</h2>
+                <p>{responseFiles.length} response files saved</p>
+              </div>
+              <button
+                className="ghost-button compact-button"
+                onClick={() => responseInputRef.current?.click()}
+                type="button"
+              >
+                {isUploadingResponse ? "Uploading..." : "Upload"}
+              </button>
+            </div>
+            <input
+              accept={FILE_ACCEPT}
+              hidden
+              onChange={(event) => void uploadResponse(event.target.files)}
+              ref={responseInputRef}
+              type="file"
+            />
+            <textarea
+              className="textarea compact-textarea"
+              onChange={(event) => setResponseNotes(event.target.value)}
+              placeholder="Optional response notes"
+              value={responseNotes}
+            />
+            <div className="document-list compact-list">
+              {responseFiles.map((file) => (
+                <article className="document-row" key={file.id}>
+                  <div className="file-icon">RSP</div>
+                  <span className="document-main">
+                    <span className="document-title">{file.title}</span>
+                    <span className="document-meta">
+                      {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
+                    </span>
+                  </span>
+                  <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
+                    Download
+                  </button>
+                  <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
+                    Delete
+                  </button>
+                </article>
+              ))}
+              {responseFiles.length === 0 ? (
+                <div className="empty-library">Response files will appear here.</div>
+              ) : null}
+            </div>
+          </section>
+        </>
+      )}
+
+      {/* ══ TEAM ═════════════════════════════════════════════════════════════
+          Comments                                                             */}
+      {activeTab === "team" && (
+        <section className="workspace-section">
+          <div className="section-heading">
+            <div>
+              <h2>Comments</h2>
+              <p>{commentList.length} notes from the team</p>
+            </div>
+          </div>
+          <textarea
+            className="textarea"
+            onChange={(event) => setCommentBody(event.target.value)}
+            placeholder="Add a comment or follow-up note"
+            value={commentBody}
+          />
+          <div className="form-actions flush-actions">
+            <button
+              className="button"
+              disabled={!commentBody.trim() || isPosting}
+              onClick={() => void addComment()}
+              type="button"
+            >
+              {isPosting ? "Posting..." : "Add Comment"}
+            </button>
+          </div>
+          <div className="comment-list">
+            {commentList.map((comment) => (
+              <article className="comment-row" key={comment.id}>
+                <div>
+                  <div className="comment-meta">
+                    {comment.author_name} · {formatDate(comment.created_at)}
+                  </div>
+                  <p>{comment.body}</p>
+                </div>
+                <button className="text-danger" onClick={() => void removeComment(comment.id)} type="button">
+                  Delete
+                </button>
+              </article>
+            ))}
+            {commentList.length === 0 ? (
+              <div className="empty-library">Comments will appear here.</div>
+            ) : null}
+          </div>
+        </section>
+      )}
     </aside>
   );
 }
