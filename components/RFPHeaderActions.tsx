@@ -8,12 +8,12 @@ export function RFPHeaderActions({
   formId,
   gdriveLink,
   rfpId,
-  tenderLink,
+  sourceInputId,
 }: {
   formId: string;
   gdriveLink: string | null;
   rfpId: string;
-  tenderLink: string | null;
+  sourceInputId: string;
 }) {
   const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -40,14 +40,12 @@ export function RFPHeaderActions({
       <button className="button" form={formId} type="submit">
         Save RFP
       </button>
+      <label className="ghost-button" htmlFor={sourceInputId}>
+        Bulk Upload
+      </label>
       <button className="ghost-button" onClick={() => router.push("/")} type="button">
         Back
       </button>
-      {tenderLink ? (
-        <a className="ghost-button" href={tenderLink} rel="noreferrer" target="_blank">
-          Open Tender Link
-        </a>
-      ) : null}
       {gdriveLink ? (
         <a className="ghost-button" href={gdriveLink} rel="noreferrer" target="_blank">
           Open Google Drive

@@ -67,10 +67,12 @@ export function RFPForm({
   formId = "rfp-form",
   initialInput,
   rfp,
+  sourceInputId = "rfp-source-upload",
 }: {
   formId?: string;
   initialInput?: RfpInput;
   rfp?: Rfp | null;
+  sourceInputId?: string;
 }) {
   const router = useRouter();
   const [form, setForm] = useState<RfpInput>(() => initialInput ?? inputFromRfp(rfp));
@@ -170,6 +172,24 @@ export function RFPForm({
     <form className="rfp-form" id={formId} onSubmit={onSubmit}>
       {error ? <div className="notice error">{error}</div> : null}
       {notice ? <div className="notice">{notice}</div> : null}
+      {isEditing ? (
+        <>
+          <input
+            accept={FILE_ACCEPT}
+            className="visually-hidden-file-input"
+            id={sourceInputId}
+            multiple
+            onChange={(event) => setSourceFiles(Array.from(event.target.files ?? []))}
+            ref={sourceInputRef}
+            type="file"
+          />
+          {sourceFiles.length ? (
+            <div className="notice">
+              {sourceFiles.length} source document{sourceFiles.length === 1 ? "" : "s"} selected. Use Save RFP to upload.
+            </div>
+          ) : null}
+        </>
+      ) : null}
       <section className="form-card">
         <div className="form-card-heading">
           <h2>
@@ -318,35 +338,37 @@ export function RFPForm({
       </div>
       </section>
 
-      <section className="form-card">
-      <div className="form-field full source-upload-field">
-        <label htmlFor="rfp-source-upload">Source Documents</label>
-        <input
-          accept={FILE_ACCEPT}
-          hidden
-          id="rfp-source-upload"
-          multiple
-          onChange={(event) => setSourceFiles(Array.from(event.target.files ?? []))}
-          ref={sourceInputRef}
-          type="file"
-        />
-        <div className="inline-upload-control">
-          <button
-            className="ghost-button"
-            disabled={isSaving}
-            onClick={() => sourceInputRef.current?.click()}
-            type="button"
-          >
-            Bulk Upload
-          </button>
-          <span className="document-meta">
-            {sourceFiles.length
-              ? `${sourceFiles.length} file${sourceFiles.length === 1 ? "" : "s"} selected${sourceUploadProgress ? ` · ${sourceUploadProgress}` : ""}`
-              : "DOCX, PDF, XLSX, CSV, Markdown, or TXT"}
-          </span>
+      {!isEditing ? (
+        <section className="form-card">
+        <div className="form-field full source-upload-field">
+          <label htmlFor={sourceInputId}>Source Documents</label>
+          <input
+            accept={FILE_ACCEPT}
+            hidden
+            id={sourceInputId}
+            multiple
+            onChange={(event) => setSourceFiles(Array.from(event.target.files ?? []))}
+            ref={sourceInputRef}
+            type="file"
+          />
+          <div className="inline-upload-control">
+            <button
+              className="ghost-button"
+              disabled={isSaving}
+              onClick={() => sourceInputRef.current?.click()}
+              type="button"
+            >
+              Bulk Upload
+            </button>
+            <span className="document-meta">
+              {sourceFiles.length
+                ? `${sourceFiles.length} file${sourceFiles.length === 1 ? "" : "s"} selected${sourceUploadProgress ? ` · ${sourceUploadProgress}` : ""}`
+                : "DOCX, PDF, XLSX, CSV, Markdown, or TXT"}
+            </span>
+          </div>
         </div>
-      </div>
-      </section>
+        </section>
+      ) : null}
       {!isEditing ? (
         <div className="form-actions">
           <button className="button" disabled={isSaving} type="submit">

@@ -31,23 +31,33 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
 
   const [displayTitle, issuedBy] = rfp.client_name.split(/\s+-\s+Issued by\s+/i);
   const formId = "rfp-detail-form";
+  const sourceInputId = "rfp-source-upload";
+  const titleContent = (
+    <>
+      <h1>{displayTitle}</h1>
+      <p>
+        {[issuedBy ? `Issued by ${issuedBy}` : null, rfp.tender_code ? `Tender ${rfp.tender_code}` : null]
+          .filter(Boolean)
+          .join(" · ") || "Edit links, status, dates, and team notes for this RFP."}
+      </p>
+    </>
+  );
 
   return (
     <div className="shell">
       <section className="project-hero">
-        <div>
-          <h1>{displayTitle}</h1>
-          <p>
-            {[issuedBy ? `Issued by ${issuedBy}` : null, rfp.tender_code ? `Tender ${rfp.tender_code}` : null]
-              .filter(Boolean)
-              .join(" · ") || "Edit links, status, dates, and team notes for this RFP."}
-          </p>
-        </div>
-        <RFPHeaderActions formId={formId} gdriveLink={rfp.gdrive_link} rfpId={rfp.id} tenderLink={rfp.tender_link} />
+        {rfp.tender_link ? (
+          <a className="project-title-link" href={rfp.tender_link} rel="noreferrer" target="_blank">
+            {titleContent}
+          </a>
+        ) : (
+          <div>{titleContent}</div>
+        )}
+        <RFPHeaderActions formId={formId} gdriveLink={rfp.gdrive_link} rfpId={rfp.id} sourceInputId={sourceInputId} />
       </section>
       {workspaceError ? <div className="notice error">{workspaceError}</div> : null}
       <div className="detail-layout">
-        <RFPForm formId={formId} rfp={rfp} />
+        <RFPForm formId={formId} rfp={rfp} sourceInputId={sourceInputId} />
         <RFPWorkspace comments={comments} documents={documents} files={files} rfp={rfp} />
       </div>
     </div>

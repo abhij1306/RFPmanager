@@ -224,6 +224,17 @@ main {
   font-size: 12px;
 }
 
+.project-title-link {
+  display: block;
+  min-width: 0;
+}
+
+.project-title-link:hover h1 {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .header-actions {
   display: flex;
   flex: 0 0 auto;
@@ -231,6 +242,20 @@ main {
   justify-content: flex-end;
   gap: 8px;
   max-width: min(100%, 720px);
+}
+
+.header-actions .ghost-button {
+  cursor: pointer;
+}
+
+.visually-hidden-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 .page-title p,
