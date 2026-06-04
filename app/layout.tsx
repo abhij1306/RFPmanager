@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Link from "next/link";
+import { AppNav } from "@/components/AppNav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,11 +39,7 @@ export default function RootLayout({
             </label>
           </div>
           <div className="header-right">
-            <nav aria-label="Primary navigation">
-              <Link href="/">Tracker</Link>
-              <Link href="/convert">Converter</Link>
-              <Link href="/bookmarklet">Import</Link>
-            </nav>
+            <AppNav />
           </div>
         </header>
         <main>{children}</main>

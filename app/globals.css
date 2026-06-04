@@ -156,7 +156,7 @@ main {
   letter-spacing: 0.05em;
 }
 
-.app-header nav a:first-child,
+.app-header nav a.active,
 .app-header nav a:hover {
   color: var(--accent);
   border-bottom-color: var(--accent);
