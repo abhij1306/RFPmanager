@@ -748,8 +748,8 @@ main {
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: 6px;
-  font-family: var(--font-mono), "Cascadia Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
-  font-size: 12px;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
   line-height: 1.55;
   resize: vertical;
   white-space: pre-wrap;
