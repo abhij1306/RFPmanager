@@ -488,7 +488,10 @@ main {
 
 .workspace-panel {
   display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 0;
+  height: calc(100svh - 148px);
+  min-height: 560px;
   min-width: 0;
   padding: 0;
   overflow: hidden;
@@ -497,6 +500,7 @@ main {
 .workspace-section {
   display: grid;
   gap: 10px;
+  min-height: 0;
 }
 
 .workspace-panel > .workspace-section {
@@ -706,6 +710,48 @@ main {
   padding-right: 2px;
 }
 
+.response-section {
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+}
+
+.response-section .compact-textarea {
+  min-height: 44px;
+}
+
+.response-section .compact-list {
+  display: grid;
+  max-height: none;
+  min-height: 0;
+}
+
+.response-draft-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.response-draft-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+
+.response-draft-preview {
+  min-height: 0;
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  resize: none;
+}
+
 .text-button {
   color: inherit;
   background: transparent;
@@ -832,6 +878,15 @@ main {
 @media (max-width: 960px) {
   .detail-layout {
     grid-template-columns: 1fr;
+  }
+
+  .workspace-panel {
+    height: auto;
+    min-height: 0;
+  }
+
+  .response-draft-preview {
+    min-height: 420px;
   }
 
   .bookmarklet-grid {

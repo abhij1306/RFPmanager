@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { RFPWorkspace } from "@/components/RFPWorkspace";
 import type { Rfp } from "@/lib/types";
 
@@ -35,5 +35,20 @@ describe("RFPWorkspace", () => {
 
     expect(screen.getByText("Tender Response Draft")).toBeInTheDocument();
     expect(screen.getByText("We propose a managed content platform implementation.")).toBeInTheDocument();
+  });
+
+  it("copies the response draft text", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText },
+    });
+    render(<RFPWorkspace comments={[]} documents={[]} files={[]} rfp={rfp} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /response/i }));
+    fireEvent.click(screen.getByRole("button", { name: /copy draft/i }));
+
+    expect(writeText).toHaveBeenCalledWith("We propose a managed content platform implementation.");
+    expect(await screen.findByText("Response draft copied to clipboard.")).toBeInTheDocument();
   });
 });

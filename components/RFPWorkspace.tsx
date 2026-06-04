@@ -206,6 +206,20 @@ export function RFPWorkspace({
     }
   }
 
+  async function copyResponseDraft() {
+    const content = rfp.response_draft_content?.trim();
+    if (!content) return;
+
+    try {
+      await navigator.clipboard.writeText(content);
+      setMessageType("info");
+      setMessage("Response draft copied to clipboard.");
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not copy response draft.");
+    }
+  }
+
   async function bulkUploadSources(files: FileList | null) {
     const selectedFiles = Array.from(files ?? []);
     if (selectedFiles.length === 0) return;
@@ -572,7 +586,7 @@ export function RFPWorkspace({
 
       {/* ══ RESPONSE ═════════════════════════════════════════════════════════ */}
       {activeTab === "response" && (
-        <section className="workspace-section">
+        <section className="workspace-section response-section">
           <div className="section-heading">
             <div>
               <h2>Responses</h2>
@@ -603,16 +617,21 @@ export function RFPWorkspace({
           />
           <div className="document-list compact-list">
             {hasResponseDraft ? (
-              <article className="document-row">
-                <div className="file-icon">TXT</div>
-                <span className="document-main">
-                  <span className="document-title">{rfp.response_draft_title ?? "Response Draft"}</span>
-                  <span className="document-meta">
-                    Draft text
-                    {rfp.response_draft_saved_at ? ` · Saved ${formatDate(rfp.response_draft_saved_at)}` : ""}
+              <article className="response-draft-panel">
+                <div className="response-draft-heading">
+                  <div className="file-icon">TXT</div>
+                  <span className="document-main">
+                    <span className="document-title">{rfp.response_draft_title ?? "Response Draft"}</span>
+                    <span className="document-meta">
+                      Draft text
+                      {rfp.response_draft_saved_at ? ` · Saved ${formatDate(rfp.response_draft_saved_at)}` : ""}
+                    </span>
                   </span>
-                  <pre className="markdown-preview document-preview">{rfp.response_draft_content}</pre>
-                </span>
+                  <button className="ghost-button compact-button" onClick={() => void copyResponseDraft()} type="button">
+                    Copy draft
+                  </button>
+                </div>
+                <pre className="markdown-preview response-draft-preview">{rfp.response_draft_content}</pre>
               </article>
             ) : null}
             {responseFiles.map((file) => (
