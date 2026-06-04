@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { createComment, deleteComment } from "@/lib/comments";
 import { convertFile } from "@/lib/document-conversion";
-import { createDocument } from "@/lib/documents";
+import { createDocument, deleteDocument } from "@/lib/documents";
 import { createRfpFileDownloadUrl, deleteRfpFile, uploadRfpFile } from "@/lib/rfp-files";
 import type { Rfp, RfpComment, RfpDocument, RfpDocumentSourceType, RfpFile } from "@/lib/types";
 
@@ -78,6 +78,7 @@ export function RFPWorkspace({
   const [documentList, setDocumentList] = useState(documents);
   const [fileList, setFileList] = useState(files);
   const [commentBody, setCommentBody] = useState("");
+  const [activeDocument, setActiveDocument] = useState<RfpDocument | null>(documents[0] ?? null);
   const [summary, setSummary] = useState(rfp.summary ?? "");
   const [summaryGeneratedAt, setSummaryGeneratedAt] = useState(rfp.summary_generated_at);
   const [markdownDraft, setMarkdownDraft] = useState("");
@@ -156,6 +157,22 @@ export function RFPWorkspace({
     } catch (error) {
       setMessageType("error");
       setMessage(error instanceof Error ? error.message : "Could not delete comment.");
+    }
+  }
+
+  async function removeDocument(id: string) {
+    if (!window.confirm("Delete this saved markdown?")) return;
+    setMessage(null);
+    setMessageType("info");
+    try {
+      await deleteDocument(id);
+      setDocumentList((current) => current.filter((document) => document.id !== id));
+      if (activeDocument?.id === id) {
+        setActiveDocument(documentList.find((document) => document.id !== id) ?? null);
+      }
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not delete saved markdown.");
     }
   }
 
@@ -281,6 +298,7 @@ export function RFPWorkspace({
       });
       const nextDocuments = [saved, ...documentList];
       setDocumentList(nextDocuments);
+      setActiveDocument(saved);
       setMarkdownDraft("");
       setMarkdownTitle("");
       setSourceFileName("");
@@ -300,7 +318,7 @@ export function RFPWorkspace({
   // ── Tab config ────────────────────────────────────────────────────────────
   const tabs: { id: WorkspaceTab; label: string; count?: number }[] = [
     { id: "summary", label: "Summary" },
-    { id: "sources", label: "Sources", count: sourceFiles.length + rfp.document_links.length },
+    { id: "sources", label: "Sources", count: documentList.length + sourceFiles.length + rfp.document_links.length },
     { id: "response", label: "Response", count: responseFiles.length },
     { id: "team", label: "Team", count: commentList.length },
   ];
@@ -367,10 +385,9 @@ export function RFPWorkspace({
         </section>
       )}
 
-      {/* ══ SOURCES ══════════════════════════════════════════════════════════
-          Add Markdown · Source Documents · Tender Links                       */}
+      {/* ══ SOURCES ══════════════════════════════════════════════════════════ */}
       {activeTab === "sources" && (
-        <>
+        <div className="sources-tab">
           <section className="workspace-section">
             <div className="section-heading">
               <div>
@@ -427,66 +444,101 @@ export function RFPWorkspace({
             </div>
           </section>
 
-          <section className="workspace-section">
+          <section className="workspace-section source-markdown-section">
             <div className="section-heading">
               <div>
-                <h2>Source Documents</h2>
-                <p>{sourceFiles.length} original files saved</p>
+                <h2>Saved Markdown</h2>
+                <p>{documentList.length} converted markdown files</p>
               </div>
             </div>
-            <div className="document-list compact-list">
-              {sourceFiles.map((file) => (
-                <article className="document-row" key={file.id}>
-                  <div className="file-icon">SRC</div>
-                  <span className="document-main">
-                    <span className="document-title">{file.title}</span>
-                    <span className="document-meta">
-                      {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
-                    </span>
-                  </span>
-                  <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
-                    Download
-                  </button>
-                  <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
-                    Delete
-                  </button>
-                </article>
-              ))}
-              {sourceFiles.length === 0 ? (
-                <div className="empty-library">Original uploaded documents will appear here.</div>
+            <div className="source-markdown-layout">
+              <div className="document-list compact-list source-document-list">
+                {documentList.map((document) => (
+                  <article className={`document-row ${activeDocument?.id === document.id ? "active" : ""}`} key={document.id}>
+                    <div className="file-icon">MD</div>
+                    <button className="document-main text-button" onClick={() => setActiveDocument(document)} type="button">
+                      <span className="document-title">{document.title}</span>
+                      <span className="document-meta">
+                        {document.source_type.toUpperCase()} · {formatDate(document.created_at)}
+                      </span>
+                    </button>
+                    <button className="ghost-button compact-button" onClick={() => void removeDocument(document.id)} type="button">
+                      Delete
+                    </button>
+                  </article>
+                ))}
+                {documentList.length === 0 ? (
+                  <div className="empty-library">Converted markdown will appear here.</div>
+                ) : null}
+              </div>
+              {activeDocument ? (
+                <pre className="markdown-preview source-markdown-preview">{activeDocument.markdown}</pre>
               ) : null}
             </div>
           </section>
 
-          <section className="workspace-section">
-            <div className="section-heading">
-              <div>
-                <h2>Tender Links</h2>
-                <p>{rfp.document_links.length} imported document URLs</p>
+          <div className="source-assets-grid">
+            <section className="workspace-section">
+              <div className="section-heading">
+                <div>
+                  <h2>Uploaded Files</h2>
+                  <p>{sourceFiles.length} original files saved</p>
+                </div>
               </div>
-            </div>
-            <div className="document-list compact-list">
-              {rfp.document_links.map((link) => (
-                <a
-                  className="document-row"
-                  href={link.url}
-                  key={`${link.name}-${link.url}`}
-                  rel="noreferrer"
-                  target="_blank"
-                >
-                  <div className="file-icon">URL</div>
-                  <span className="document-main">
-                    <span className="document-title">{link.name || link.url}</span>
-                    <span className="document-meta">{link.url}</span>
-                  </span>
-                </a>
-              ))}
-              {rfp.document_links.length === 0 ? (
-                <div className="empty-library">Imported tender document links will appear here.</div>
-              ) : null}
-            </div>
-          </section>
-        </>
+              <div className="document-list compact-list">
+                {sourceFiles.map((file) => (
+                  <article className="document-row" key={file.id}>
+                    <div className="file-icon">SRC</div>
+                    <span className="document-main">
+                      <span className="document-title">{file.title}</span>
+                      <span className="document-meta">
+                        {file.original_filename} · {file.status ?? "Saved"} · {formatDate(file.created_at)}
+                      </span>
+                    </span>
+                    <button className="ghost-button compact-button" onClick={() => void downloadFile(file)} type="button">
+                      Download
+                    </button>
+                    <button className="ghost-button compact-button" onClick={() => void removeFile(file)} type="button">
+                      Delete
+                    </button>
+                  </article>
+                ))}
+                {sourceFiles.length === 0 ? (
+                  <div className="empty-library">Original uploaded documents will appear here.</div>
+                ) : null}
+              </div>
+            </section>
+
+            <section className="workspace-section">
+              <div className="section-heading">
+                <div>
+                  <h2>Tender Links</h2>
+                  <p>{rfp.document_links.length} imported document URLs</p>
+                </div>
+              </div>
+              <div className="document-list compact-list">
+                {rfp.document_links.map((link) => (
+                  <a
+                    className="document-row"
+                    href={link.url}
+                    key={`${link.name}-${link.url}`}
+                    rel="noreferrer"
+                    target="_blank"
+                  >
+                    <div className="file-icon">URL</div>
+                    <span className="document-main">
+                      <span className="document-title">{link.name || link.url}</span>
+                      <span className="document-meta">{link.url}</span>
+                    </span>
+                  </a>
+                ))}
+                {rfp.document_links.length === 0 ? (
+                  <div className="empty-library">Imported tender document links will appear here.</div>
+                ) : null}
+              </div>
+            </section>
+          </div>
+        </div>
       )}
 
       {/* ══ RESPONSE ═════════════════════════════════════════════════════════ */}
