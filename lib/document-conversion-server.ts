@@ -61,8 +61,8 @@ export async function convertBufferToMarkdown({
   }
 
   if (sourceType === "xlsx") {
-    const { default: readXlsxFile } = await import("read-excel-file/node");
-    const sheets = await readXlsxFile(Buffer.from(await normalizeXlsxInlineStrings(buffer)));
+    const { default: readXlsxFile } = await import("read-excel-file/browser");
+    const sheets = await readXlsxFile(await normalizeXlsxInlineStrings(buffer));
     return { markdown: sheets.map(({ sheet, data }) => sheetRowsToMarkdown(sheet, data)).join("\n\n"), sourceType };
   }
 
