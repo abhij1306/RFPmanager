@@ -1,7 +1,12 @@
 import TurndownService from "turndown";
 import { getAllowedFileSourceType } from "@/lib/chatgpt-files";
 import { cleanConvertedMarkdown, removeHtmlImages } from "@/lib/document-markdown-cleanup";
-import { parseCsv, sheetRowsToMarkdown, type ConversionResult } from "@/lib/document-conversion";
+import {
+  normalizeXlsxInlineStrings,
+  parseCsv,
+  sheetRowsToMarkdown,
+  type ConversionResult,
+} from "@/lib/document-conversion";
 
 function htmlToMarkdown(html: string): string {
   const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
@@ -56,8 +61,8 @@ export async function convertBufferToMarkdown({
   }
 
   if (sourceType === "xlsx") {
-    const { default: readXlsxFile } = await import("read-excel-file/browser");
-    const sheets = await readXlsxFile(new Blob([buffer]));
+    const { default: readXlsxFile } = await import("read-excel-file/node");
+    const sheets = await readXlsxFile(Buffer.from(await normalizeXlsxInlineStrings(buffer)));
     return { markdown: sheets.map(({ sheet, data }) => sheetRowsToMarkdown(sheet, data)).join("\n\n"), sourceType };
   }
 

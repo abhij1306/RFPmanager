@@ -1,3 +1,4 @@
+import { strFromU8, strToU8, unzipSync, zipSync } from "fflate";
 import TurndownService from "turndown";
 import { getAllowedFileSourceType } from "@/lib/chatgpt-files";
 import { cleanConvertedMarkdown, removeHtmlImages } from "@/lib/document-markdown-cleanup";
@@ -83,6 +84,157 @@ function htmlToMarkdown(html: string): string {
   return cleanConvertedMarkdown(turndown.turndown(removeHtmlImages(html)));
 }
 
+type XmlTools = {
+  parse(xml: string): Document;
+  serialize(document: Document): string;
+};
+
+async function getXmlTools(): Promise<XmlTools> {
+  if (typeof DOMParser !== "undefined" && typeof XMLSerializer !== "undefined") {
+    return {
+      parse: (xml) => new DOMParser().parseFromString(xml, "application/xml"),
+      serialize: (document) => new XMLSerializer().serializeToString(document),
+    };
+  }
+
+  const { DOMParser: XmldomParser, XMLSerializer: XmldomSerializer } = await import("@xmldom/xmldom");
+  const serializer = new XmldomSerializer() as { serializeToString(document: unknown): string };
+
+  return {
+    parse: (xml) => new XmldomParser().parseFromString(xml, "application/xml") as unknown as Document,
+    serialize: (document) => serializer.serializeToString(document),
+  };
+}
+
+function getLocalName(node: Node): string {
+  const localName = (node as { localName?: string }).localName;
+  if (localName) {
+    return localName;
+  }
+
+  const nodeName = (node as { nodeName?: string }).nodeName;
+  if (nodeName) {
+    return nodeName.replace(/^.*:/, "");
+  }
+
+  return "";
+}
+
+function getElementChildren(element: Element): Element[] {
+  const children: Element[] = [];
+
+  for (let index = 0; index < element.childNodes.length; index += 1) {
+    const child = element.childNodes.item(index);
+    if (child.nodeType === 1) {
+      children.push(child as Element);
+    }
+  }
+
+  return children;
+}
+
+function getTextFromElement(element: Element): string {
+  if (getLocalName(element) === "t") {
+    return element.textContent ?? "";
+  }
+
+  return getElementChildren(element)
+    .map((child) => getTextFromElement(child))
+    .join("");
+}
+
+function getAllElements(document: Document): Element[] {
+  const elements = document.getElementsByTagName("*");
+  return Array.from({ length: elements.length }, (_, index) => elements.item(index)).filter(
+    (element): element is Element => Boolean(element),
+  );
+}
+
+function wrapUnsupportedInlineStringRuns(xml: string, xmlTools: XmlTools): string {
+  const document = xmlTools.parse(xml);
+  let changed = false;
+
+  for (const cell of getAllElements(document)) {
+    if (getLocalName(cell) !== "c" || cell.getAttribute("t") !== "inlineStr") {
+      continue;
+    }
+
+    const elementChildren = getElementChildren(cell);
+    const inlineString = elementChildren.find((child) => getLocalName(child) === "is");
+
+    if (inlineString) {
+      const [firstInlineChild] = getElementChildren(inlineString);
+      if (firstInlineChild && getLocalName(firstInlineChild) === "t") {
+        continue;
+      }
+
+      const textElement = document.createElement("t");
+      textElement.appendChild(document.createTextNode(getTextFromElement(inlineString)));
+
+      while (inlineString.firstChild) {
+        inlineString.removeChild(inlineString.firstChild);
+      }
+      inlineString.appendChild(textElement);
+      changed = true;
+      continue;
+    }
+
+    const inlineChildren = elementChildren.filter((child) =>
+      ["r", "t", "rPh", "phoneticPr"].includes(getLocalName(child)),
+    );
+
+    if (inlineChildren.length === 0) {
+      continue;
+    }
+
+    const normalizedInlineString = cell.namespaceURI
+      ? document.createElementNS(cell.namespaceURI, "is")
+      : document.createElement("is");
+    const textElement = document.createElement("t");
+    textElement.appendChild(document.createTextNode(inlineChildren.map((child) => getTextFromElement(child)).join("")));
+
+    normalizedInlineString.appendChild(textElement);
+    cell.insertBefore(normalizedInlineString, inlineChildren[0]);
+    for (const child of inlineChildren) {
+      cell.removeChild(child);
+    }
+    changed = true;
+  }
+
+  return changed ? xmlTools.serialize(document) : xml;
+}
+
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
+export async function normalizeXlsxInlineStrings(arrayBuffer: ArrayBuffer): Promise<ArrayBuffer> {
+  const archive = unzipSync(new Uint8Array(arrayBuffer));
+  const xmlTools = await getXmlTools();
+  let changed = false;
+
+  for (const [path, bytes] of Object.entries(archive)) {
+    if (!/^xl\/worksheets\/.+\.xml$/i.test(path)) {
+      continue;
+    }
+
+    const xml = strFromU8(bytes);
+    if (!xml.includes("inlineStr")) {
+      continue;
+    }
+
+    const normalizedXml = wrapUnsupportedInlineStringRuns(xml, xmlTools);
+    if (normalizedXml !== xml) {
+      archive[path] = strToU8(normalizedXml);
+      changed = true;
+    }
+  }
+
+  return changed ? toArrayBuffer(zipSync(archive)) : arrayBuffer;
+}
+
 async function convertDocx(file: File): Promise<string> {
   const mammoth = await import("mammoth/mammoth.browser");
   const arrayBuffer = await file.arrayBuffer();
@@ -114,7 +266,7 @@ async function convertSpreadsheet(file: File, extension: "xlsx" | "csv"): Promis
   }
 
   const { default: readXlsxFile } = await import("read-excel-file/browser");
-  const sheets = await readXlsxFile(file);
+  const sheets = await readXlsxFile(await normalizeXlsxInlineStrings(await file.arrayBuffer()));
   return sheets.map(({ sheet, data }) => sheetRowsToMarkdown(sheet, data)).join("\n\n");
 }
 
