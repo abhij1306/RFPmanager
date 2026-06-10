@@ -1,5 +1,12 @@
 import type { RfpDocumentSourceType } from "@/lib/types";
 
+export class ValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ValidationError";
+  }
+}
+
 export type OpenAiFileRef = {
   id: string;
   name: string;
@@ -80,11 +87,11 @@ export function validateResponseDraftInput(payload: unknown): { title: string; c
   const draft = payload as { title?: unknown; content?: unknown };
 
   if (typeof draft.title !== "string" || !draft.title.trim()) {
-    throw new Error("title is required.");
+    throw new ValidationError("title is required.");
   }
 
   if (typeof draft.content !== "string" || !draft.content.trim()) {
-    throw new Error("content is required.");
+    throw new ValidationError("content is required.");
   }
 
   return {

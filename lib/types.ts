@@ -45,6 +45,12 @@ export type RfpInput = {
   pipeline_stage: PipelineStage;
 };
 
+export type RfpCreateInput = Omit<
+  RfpInput,
+  "response_draft_title" | "response_draft_content" | "response_draft_saved_at"
+> &
+  Partial<Pick<RfpInput, "response_draft_title" | "response_draft_content" | "response_draft_saved_at">>;
+
 export type TenderDocumentLink = {
   name: string;
   url: string;

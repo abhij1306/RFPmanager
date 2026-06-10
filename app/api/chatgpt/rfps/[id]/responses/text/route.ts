@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { validateResponseDraftInput } from "@/lib/chatgpt-files";
+import { ValidationError, validateResponseDraftInput } from "@/lib/chatgpt-files";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
 import { getRfp, updateRfpResponseDraft } from "@/lib/rfps";
 
@@ -32,9 +32,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       },
     });
   } catch (error) {
+    const isValidationError = error instanceof ValidationError || (error instanceof Error && error.name === "ValidationError");
+
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Could not save response draft." },
-      { status: 400 },
+      { status: isValidationError ? 400 : 500 },
     );
   }
 }

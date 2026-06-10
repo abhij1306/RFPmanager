@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import type { Rfp, RfpImportInput, RfpInput, RfpUpdateInput, TenderDocumentLink } from "@/lib/types";
+import type { Rfp, RfpCreateInput, RfpImportInput, RfpInput, RfpUpdateInput, TenderDocumentLink } from "@/lib/types";
 
 const selectFields =
   "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, contact_person, contact_phone, contact_email, document_links, summary, summary_generated_at, response_draft_title, response_draft_content, response_draft_saved_at, notes, pipeline_stage, created_at";
@@ -180,7 +180,7 @@ export async function getRfp(id: string): Promise<Rfp | null> {
   return data ? withRfpDefaults(data) : null;
 }
 
-export async function createRfp(input: RfpInput): Promise<Rfp> {
+export async function createRfp(input: RfpCreateInput): Promise<Rfp> {
   const supabase = getSupabase();
   const { data, error } = await supabase.from("rfps").insert(input).select(selectFields).single();
 

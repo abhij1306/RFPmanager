@@ -553,12 +553,26 @@ main {
   justify-content: space-between;
   text-align: left;
   width: 100%;
-  cursor: pointer;
   transition: background-color 0.16s ease;
 }
 
 .collapsible-rfp-trigger:hover {
   background-color: var(--soft);
+}
+
+.collapsible-rfp-toggle {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.collapsible-rfp-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .trigger-left {

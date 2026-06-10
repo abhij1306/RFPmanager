@@ -31,6 +31,32 @@ const emptyInput: RfpInput = {
   pipeline_stage: "Prospects",
 };
 
+type RFPFormProps = Readonly<{
+  formId?: string;
+  initialInput?: RfpInput;
+  rfp?: Rfp | null;
+  sourceInputId?: string;
+  collapsible?: boolean;
+}>;
+
+type EditableRfpInput = Pick<
+  RfpInput,
+  | "client_name"
+  | "status"
+  | "closing_date"
+  | "tender_code"
+  | "tender_link"
+  | "gdrive_link"
+  | "description"
+  | "contact_person"
+  | "contact_phone"
+  | "contact_email"
+  | "notes"
+  | "pipeline_stage"
+>;
+
+type SetField = <K extends keyof RfpInput>(field: K, value: RfpInput[K]) => void;
+
 function cleanValue(value: string): string | null {
   const trimmed = value.trim();
   return trimmed.length ? trimmed : null;
@@ -63,130 +89,121 @@ function inputFromRfp(rfp?: Rfp | null): RfpInput {
   };
 }
 
-export function RFPForm({
-  formId = "rfp-form",
-  initialInput,
-  rfp,
-  sourceInputId = "rfp-source-upload",
-  collapsible = false,
-}: {
-  formId?: string;
-  initialInput?: RfpInput;
-  rfp?: Rfp | null;
-  sourceInputId?: string;
-  collapsible?: boolean;
-}) {
-  const router = useRouter();
-  const [form, setForm] = useState<RfpInput>(() => initialInput ?? inputFromRfp(rfp));
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const [sourceFiles, setSourceFiles] = useState<File[]>([]);
-  const [sourceUploadProgress, setSourceUploadProgress] = useState("");
-  const [isCollapsed, setIsCollapsed] = useState(true);
-  const sourceInputRef = useRef<HTMLInputElement>(null);
-  const isEditing = Boolean(rfp);
-
-  async function uploadSelectedSources(rfpId: string) {
-    if (sourceFiles.length === 0) {
-      return 0;
-    }
-
-    setSourceUploadProgress(`0/${sourceFiles.length}`);
-    const saved = await uploadSourceDocuments({
-      files: sourceFiles,
-      onProgress: (completed, total) => setSourceUploadProgress(`${completed}/${total}`),
-      rfpId,
-    });
-    setSourceFiles([]);
-    setSourceUploadProgress("");
-    if (sourceInputRef.current) sourceInputRef.current.value = "";
-    return saved.length;
-  }
-
-  function setField<K extends keyof RfpInput>(field: K, value: RfpInput[K]) {
-    setForm((current) => ({ ...current, [field]: value }));
-  }
-
-  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setNotice(null);
-    setIsSaving(true);
-
-    const editableInput = {
-      client_name: form.client_name.trim(),
-      status: form.status,
-      closing_date: form.closing_date || null,
-      tender_code: cleanValue(form.tender_code ?? ""),
-      tender_link: cleanValue(form.tender_link ?? ""),
-      gdrive_link: cleanValue(form.gdrive_link ?? ""),
-      description: cleanValue(form.description ?? ""),
-      contact_person: cleanValue(form.contact_person ?? ""),
-      contact_phone: cleanValue(form.contact_phone ?? ""),
-      contact_email: cleanValue(form.contact_email ?? ""),
-      notes: cleanValue(form.notes ?? ""),
-      pipeline_stage: form.pipeline_stage,
-    };
-
-    if (!editableInput.client_name) {
-      setError("Client name is required.");
-      setIsSaving(false);
-      return;
-    }
-
-    try {
-      const saved =
-        isEditing && rfp
-          ? await updateRfp(rfp.id, editableInput)
-          : await createRfp({
-              ...editableInput,
-              document_links: form.document_links,
-              summary: form.summary,
-              summary_generated_at: form.summary_generated_at,
-              response_draft_title: form.response_draft_title,
-              response_draft_content: form.response_draft_content,
-              response_draft_saved_at: form.response_draft_saved_at,
-            });
-      const uploadedSourceCount = await uploadSelectedSources(saved.id);
-
-      setForm(inputFromRfp(saved));
-
-      if (isEditing) {
-        setNotice(
-          uploadedSourceCount
-            ? `RFP saved with ${uploadedSourceCount} source document${uploadedSourceCount === 1 ? "" : "s"}.`
-            : "RFP saved.",
-        );
-        setIsSaving(false);
-        router.refresh();
-      } else {
-        router.push(`/rfp/${saved.id}`);
-        router.refresh();
-      }
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Could not save this RFP.");
-      setSourceUploadProgress("");
-      setIsSaving(false);
-    }
-  }
-
-  const formatDateString = (dateStr: string) => {
-    const [year, month, day] = dateStr.split("-");
-    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+function editableInputFromForm(form: RfpInput): EditableRfpInput {
+  return {
+    client_name: form.client_name.trim(),
+    status: form.status,
+    closing_date: form.closing_date || null,
+    tender_code: cleanValue(form.tender_code ?? ""),
+    tender_link: cleanValue(form.tender_link ?? ""),
+    gdrive_link: cleanValue(form.gdrive_link ?? ""),
+    description: cleanValue(form.description ?? ""),
+    contact_person: cleanValue(form.contact_person ?? ""),
+    contact_phone: cleanValue(form.contact_phone ?? ""),
+    contact_email: cleanValue(form.contact_email ?? ""),
+    notes: cleanValue(form.notes ?? ""),
+    pipeline_stage: form.pipeline_stage,
   };
+}
 
-  const renderGeneralInfo = () => (
+function createInputFromForm(form: RfpInput, editableInput: EditableRfpInput): RfpInput {
+  return {
+    ...editableInput,
+    document_links: form.document_links,
+    summary: form.summary,
+    summary_generated_at: form.summary_generated_at,
+    response_draft_title: form.response_draft_title,
+    response_draft_content: form.response_draft_content,
+    response_draft_saved_at: form.response_draft_saved_at,
+  };
+}
+
+async function saveRfp({
+  editableInput,
+  form,
+  isEditing,
+  rfp,
+}: Readonly<{
+  editableInput: EditableRfpInput;
+  form: RfpInput;
+  isEditing: boolean;
+  rfp?: Rfp | null;
+}>): Promise<Rfp> {
+  if (isEditing && rfp) {
+    return updateRfp(rfp.id, editableInput);
+  }
+
+  return createRfp(createInputFromForm(form, editableInput));
+}
+
+function formatDateString(dateStr: string): string {
+  const [year, month, day] = dateStr.split("-");
+  const date = new Date(Number.parseInt(year, 10), Number.parseInt(month, 10) - 1, Number.parseInt(day, 10));
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function pluralSuffix(count: number): string {
+  return count === 1 ? "" : "s";
+}
+
+function savedNotice(sourceDocumentCount: number): string {
+  if (sourceDocumentCount === 0) {
+    return "RFP saved.";
+  }
+
+  return `RFP saved with ${sourceDocumentCount} source document${pluralSuffix(sourceDocumentCount)}.`;
+}
+
+function selectedSourceNotice(sourceFileCount: number): string {
+  return `${sourceFileCount} source document${pluralSuffix(sourceFileCount)} selected. Use Save RFP to upload.`;
+}
+
+function sourceFileLabel(sourceFileCount: number, sourceUploadProgress: string): string {
+  if (sourceFileCount === 0) {
+    return "DOCX, PDF, XLSX, CSV, Markdown, or TXT";
+  }
+
+  const progressText = sourceUploadProgress ? ` · ${sourceUploadProgress}` : "";
+  return `${sourceFileCount} file${pluralSuffix(sourceFileCount)} selected${progressText}`;
+}
+
+function saveButtonText(isSaving: boolean, sourceUploadProgress: string): string {
+  if (!isSaving) {
+    return "Create RFP";
+  }
+
+  if (sourceUploadProgress) {
+    return `Saving docs ${sourceUploadProgress}`;
+  }
+
+  return "Saving...";
+}
+
+function statusClassName(status: RfpInput["status"]): string {
+  return `summary-item status-badge status-${status.toLowerCase().replace(/\s+/g, "-")}`;
+}
+
+function GeneralInfoFields({
+  collapsible,
+  form,
+  setField,
+}: Readonly<{
+  collapsible: boolean;
+  form: RfpInput;
+  setField: SetField;
+}>) {
+  const reviewLabel = form.status === "TBD" ? "In review" : form.status;
+
+  return (
     <>
       <div className="form-card-heading">
         <h2>
-          <span aria-hidden="true" className="section-icon">i</span>
+          <span aria-hidden="true" className="section-icon">
+            i
+          </span>{" "}
           General info
         </h2>
-        {!collapsible && (
-          <span className="review-badge">{form.status === "TBD" ? "In review" : form.status}</span>
-        )}
+        {collapsible ? null : <span className="review-badge">{reviewLabel}</span>}
       </div>
       <div className="form-grid">
         <div className="form-field">
@@ -271,12 +288,22 @@ export function RFPForm({
       </div>
     </>
   );
+}
 
-  const renderContactDetails = () => (
+function ContactDetailsFields({
+  form,
+  setField,
+}: Readonly<{
+  form: RfpInput;
+  setField: SetField;
+}>) {
+  return (
     <>
       <div className="form-card-heading">
         <h2>
-          <span aria-hidden="true" className="section-icon">□</span>
+          <span aria-hidden="true" className="section-icon">
+            □
+          </span>{" "}
           Contact details
         </h2>
       </div>
@@ -330,145 +357,353 @@ export function RFPForm({
       </div>
     </>
   );
+}
+
+function FormSections({
+  collapsible,
+  form,
+  setField,
+}: Readonly<{
+  collapsible: boolean;
+  form: RfpInput;
+  setField: SetField;
+}>) {
+  return (
+    <>
+      <section className={collapsible ? "form-card-inline" : "form-card"}>
+        <GeneralInfoFields collapsible={collapsible} form={form} setField={setField} />
+      </section>
+      <section className={collapsible ? "form-card-inline" : "form-card"}>
+        <ContactDetailsFields form={form} setField={setField} />
+      </section>
+    </>
+  );
+}
+
+function SummaryLink({
+  href,
+  title,
+  children,
+}: Readonly<{
+  href: string;
+  title: string;
+  children: React.ReactNode;
+}>) {
+  return (
+    <a
+      className="summary-item link-btn"
+      href={href}
+      onClick={(event) => event.stopPropagation()}
+      rel="noreferrer"
+      target="_blank"
+      title={title}
+    >
+      {children}
+    </a>
+  );
+}
+
+function CollapsedSummary({ form }: Readonly<{ form: RfpInput }>) {
+  return (
+    <div className="trigger-summary">
+      <span className={statusClassName(form.status)}>{form.status}</span>
+      <span className="summary-item stage-badge">{form.pipeline_stage}</span>
+      {form.closing_date ? <span className="summary-item date-badge">Due: {formatDateString(form.closing_date)}</span> : null}
+      {form.tender_link ? (
+        <SummaryLink href={form.tender_link} title="Open Tender Link">
+          🔗 Tender
+        </SummaryLink>
+      ) : null}
+      {form.gdrive_link ? (
+        <SummaryLink href={form.gdrive_link} title="Open Google Drive">
+          📁 Drive
+        </SummaryLink>
+      ) : null}
+    </div>
+  );
+}
+
+function CollapsibleFields({
+  form,
+  isCollapsed,
+  onToggle,
+  setField,
+}: Readonly<{
+  form: RfpInput;
+  isCollapsed: boolean;
+  onToggle: () => void;
+  setField: SetField;
+}>) {
+  const triggerText = isCollapsed ? "Show RFP Details & Settings" : "Hide RFP Details & Settings";
+
+  return (
+    <div className="collapsible-rfp-details">
+      <div className="collapsible-rfp-trigger">
+        <button
+          aria-expanded={!isCollapsed}
+          className="collapsible-rfp-toggle trigger-left"
+          onClick={onToggle}
+          type="button"
+        >
+          <span className={`trigger-chevron ${isCollapsed ? "" : "expanded"}`}>▼</span>
+          <span className="trigger-title">{triggerText}</span>
+        </button>
+        {isCollapsed ? <CollapsedSummary form={form} /> : null}
+      </div>
+      <div className={`collapsible-rfp-content ${isCollapsed ? "collapsed" : ""}`}>
+        <div className="collapsible-form-grid">
+          <FormSections collapsible form={form} setField={setField} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SourceUploadInput({
+  className,
+  hidden = false,
+  onFilesSelected,
+  sourceInputId,
+  sourceInputRef,
+}: Readonly<{
+  className?: string;
+  hidden?: boolean;
+  onFilesSelected: (files: File[]) => void;
+  sourceInputId: string;
+  sourceInputRef: React.RefObject<HTMLInputElement | null>;
+}>) {
+  return (
+    <input
+      accept={FILE_ACCEPT}
+      className={className}
+      hidden={hidden}
+      id={sourceInputId}
+      multiple
+      onChange={(event) => onFilesSelected(Array.from(event.target.files ?? []))}
+      ref={sourceInputRef}
+      type="file"
+    />
+  );
+}
+
+function EditingSourceUpload({
+  isEditing,
+  onFilesSelected,
+  sourceFileCount,
+  sourceInputId,
+  sourceInputRef,
+}: Readonly<{
+  isEditing: boolean;
+  onFilesSelected: (files: File[]) => void;
+  sourceFileCount: number;
+  sourceInputId: string;
+  sourceInputRef: React.RefObject<HTMLInputElement | null>;
+}>) {
+  if (!isEditing) {
+    return null;
+  }
+
+  return (
+    <>
+      <SourceUploadInput
+        className="visually-hidden-file-input"
+        onFilesSelected={onFilesSelected}
+        sourceInputId={sourceInputId}
+        sourceInputRef={sourceInputRef}
+      />
+      {sourceFileCount > 0 ? <div className="notice">{selectedSourceNotice(sourceFileCount)}</div> : null}
+    </>
+  );
+}
+
+function CreateSourceUpload({
+  isCreating,
+  isSaving,
+  onFilesSelected,
+  sourceFileCount,
+  sourceInputId,
+  sourceInputRef,
+  sourceUploadProgress,
+}: Readonly<{
+  isCreating: boolean;
+  isSaving: boolean;
+  onFilesSelected: (files: File[]) => void;
+  sourceFileCount: number;
+  sourceInputId: string;
+  sourceInputRef: React.RefObject<HTMLInputElement | null>;
+  sourceUploadProgress: string;
+}>) {
+  if (!isCreating) {
+    return null;
+  }
+
+  return (
+    <section className="form-card">
+      <div className="form-field full source-upload-field">
+        <label htmlFor={sourceInputId}>Source Documents</label>
+        <SourceUploadInput
+          hidden
+          onFilesSelected={onFilesSelected}
+          sourceInputId={sourceInputId}
+          sourceInputRef={sourceInputRef}
+        />
+        <div className="inline-upload-control">
+          <button className="ghost-button" disabled={isSaving} onClick={() => sourceInputRef.current?.click()} type="button">
+            Bulk Upload
+          </button>
+          <span className="document-meta">{sourceFileLabel(sourceFileCount, sourceUploadProgress)}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CreateActions({
+  isCreating,
+  isSaving,
+  onBack,
+  sourceUploadProgress,
+}: Readonly<{
+  isCreating: boolean;
+  isSaving: boolean;
+  onBack: () => void;
+  sourceUploadProgress: string;
+}>) {
+  if (!isCreating) {
+    return null;
+  }
+
+  return (
+    <div className="form-actions">
+      <button className="button" disabled={isSaving} type="submit">
+        {saveButtonText(isSaving, sourceUploadProgress)}
+      </button>
+      <button className="ghost-button" onClick={onBack} type="button">
+        Back
+      </button>
+    </div>
+  );
+}
+
+export function RFPForm({
+  formId = "rfp-form",
+  initialInput,
+  rfp,
+  sourceInputId = "rfp-source-upload",
+  collapsible = false,
+}: RFPFormProps) {
+  const router = useRouter();
+  const [form, setForm] = useState<RfpInput>(() => initialInput ?? inputFromRfp(rfp));
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [sourceFiles, setSourceFiles] = useState<File[]>([]);
+  const [sourceUploadProgress, setSourceUploadProgress] = useState("");
+  const [isCollapsed, setIsCollapsed] = useState(true);
+  const sourceInputRef = useRef<HTMLInputElement>(null);
+  const isEditing = Boolean(rfp);
+  const isCreating = !isEditing;
+
+  async function uploadSelectedSources(rfpId: string) {
+    if (sourceFiles.length === 0) {
+      return 0;
+    }
+
+    setSourceUploadProgress(`0/${sourceFiles.length}`);
+    const saved = await uploadSourceDocuments({
+      files: sourceFiles,
+      onProgress: (completed, total) => setSourceUploadProgress(`${completed}/${total}`),
+      rfpId,
+    });
+    setSourceFiles([]);
+    setSourceUploadProgress("");
+
+    if (sourceInputRef.current) {
+      sourceInputRef.current.value = "";
+    }
+
+    return saved.length;
+  }
+
+  function setField<K extends keyof RfpInput>(field: K, value: RfpInput[K]) {
+    setForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function onSubmit(event: React.SyntheticEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setNotice(null);
+    setIsSaving(true);
+
+    const editableInput = editableInputFromForm(form);
+
+    if (!editableInput.client_name) {
+      setError("Client name is required.");
+      setIsSaving(false);
+      return;
+    }
+
+    try {
+      const saved = await saveRfp({ editableInput, form, isEditing, rfp });
+      const uploadedSourceCount = await uploadSelectedSources(saved.id);
+
+      setForm(inputFromRfp(saved));
+
+      if (isEditing) {
+        setNotice(savedNotice(uploadedSourceCount));
+        setIsSaving(false);
+        router.refresh();
+        return;
+      }
+
+      router.push(`/rfp/${saved.id}`);
+      router.refresh();
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save this RFP.");
+      setSourceUploadProgress("");
+      setIsSaving(false);
+    }
+  }
 
   return (
     <form className={`rfp-form ${collapsible ? "collapsible-rfp-form" : ""}`} id={formId} onSubmit={onSubmit}>
       {error ? <div className="notice error">{error}</div> : null}
       {notice ? <div className="notice">{notice}</div> : null}
-      {isEditing ? (
-        <>
-          <input
-            accept={FILE_ACCEPT}
-            className="visually-hidden-file-input"
-            id={sourceInputId}
-            multiple
-            onChange={(event) => setSourceFiles(Array.from(event.target.files ?? []))}
-            ref={sourceInputRef}
-            type="file"
-          />
-          {sourceFiles.length ? (
-            <div className="notice">
-              {sourceFiles.length} source document{sourceFiles.length === 1 ? "" : "s"} selected. Use Save RFP to upload.
-            </div>
-          ) : null}
-        </>
-      ) : null}
+
+      <EditingSourceUpload
+        isEditing={isEditing}
+        onFilesSelected={setSourceFiles}
+        sourceFileCount={sourceFiles.length}
+        sourceInputId={sourceInputId}
+        sourceInputRef={sourceInputRef}
+      />
 
       {collapsible ? (
-        <div className="collapsible-rfp-details">
-          <button
-            type="button"
-            className="collapsible-rfp-trigger"
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            aria-expanded={!isCollapsed}
-          >
-            <div className="trigger-left">
-              <span className={`trigger-chevron ${isCollapsed ? "" : "expanded"}`}>▼</span>
-              <span className="trigger-title">
-                {isCollapsed ? "Show RFP Details & Settings" : "Hide RFP Details & Settings"}
-              </span>
-            </div>
-            {isCollapsed && (
-              <div className="trigger-summary">
-                <span className={`summary-item status-badge status-${form.status.toLowerCase().replace(/\s+/g, "-")}`}>
-                  {form.status}
-                </span>
-                <span className="summary-item stage-badge">{form.pipeline_stage}</span>
-                {form.closing_date && (
-                  <span className="summary-item date-badge">
-                    Due: {formatDateString(form.closing_date)}
-                  </span>
-                )}
-                {form.tender_link && (
-                  <span
-                    className="summary-item link-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.open(form.tender_link!, "_blank", "noopener,noreferrer");
-                    }}
-                    title="Open Tender Link"
-                  >
-                    🔗 Tender
-                  </span>
-                )}
-                {form.gdrive_link && (
-                  <span
-                    className="summary-item link-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.open(form.gdrive_link!, "_blank", "noopener,noreferrer");
-                    }}
-                    title="Open Google Drive"
-                  >
-                    📁 Drive
-                  </span>
-                )}
-              </div>
-            )}
-          </button>
-          <div className={`collapsible-rfp-content ${isCollapsed ? "collapsed" : ""}`}>
-            <div className="collapsible-form-grid">
-              <section className="form-card-inline">
-                {renderGeneralInfo()}
-              </section>
-              <section className="form-card-inline">
-                {renderContactDetails()}
-              </section>
-            </div>
-          </div>
-        </div>
+        <CollapsibleFields
+          form={form}
+          isCollapsed={isCollapsed}
+          onToggle={() => setIsCollapsed((current) => !current)}
+          setField={setField}
+        />
       ) : (
-        <>
-          <section className="form-card">
-            {renderGeneralInfo()}
-          </section>
-          <section className="form-card">
-            {renderContactDetails()}
-          </section>
-        </>
+        <FormSections collapsible={false} form={form} setField={setField} />
       )}
 
-      {!isEditing ? (
-        <section className="form-card">
-        <div className="form-field full source-upload-field">
-          <label htmlFor={sourceInputId}>Source Documents</label>
-          <input
-            accept={FILE_ACCEPT}
-            hidden
-            id={sourceInputId}
-            multiple
-            onChange={(event) => setSourceFiles(Array.from(event.target.files ?? []))}
-            ref={sourceInputRef}
-            type="file"
-          />
-          <div className="inline-upload-control">
-            <button
-              className="ghost-button"
-              disabled={isSaving}
-              onClick={() => sourceInputRef.current?.click()}
-              type="button"
-            >
-              Bulk Upload
-            </button>
-            <span className="document-meta">
-              {sourceFiles.length
-                ? `${sourceFiles.length} file${sourceFiles.length === 1 ? "" : "s"} selected${sourceUploadProgress ? ` · ${sourceUploadProgress}` : ""}`
-                : "DOCX, PDF, XLSX, CSV, Markdown, or TXT"}
-            </span>
-          </div>
-        </div>
-        </section>
-      ) : null}
-      {!isEditing ? (
-        <div className="form-actions">
-          <button className="button" disabled={isSaving} type="submit">
-            {isSaving ? (sourceUploadProgress ? `Saving docs ${sourceUploadProgress}` : "Saving...") : "Create RFP"}
-          </button>
-          <button className="ghost-button" onClick={() => router.push("/")} type="button">
-            Back
-          </button>
-        </div>
-      ) : null}
+      <CreateSourceUpload
+        isCreating={isCreating}
+        isSaving={isSaving}
+        onFilesSelected={setSourceFiles}
+        sourceFileCount={sourceFiles.length}
+        sourceInputId={sourceInputId}
+        sourceInputRef={sourceInputRef}
+        sourceUploadProgress={sourceUploadProgress}
+      />
+      <CreateActions
+        isCreating={isCreating}
+        isSaving={isSaving}
+        onBack={() => router.push("/")}
+        sourceUploadProgress={sourceUploadProgress}
+      />
     </form>
   );
 }

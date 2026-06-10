@@ -57,6 +57,10 @@ describe("ChatGPT file helpers", () => {
     expect(() => validateResponseDraftInput({ title: "Draft", content: "   " })).toThrow("content is required.");
   });
 
+  it("rejects GPT-created response drafts without titles", () => {
+    expect(() => validateResponseDraftInput({ title: "   ", content: "Draft" })).toThrow("title is required.");
+  });
+
   it("trims GPT-created response draft fields", () => {
     expect(validateResponseDraftInput({ title: "\nTender Response Draft\n", content: "\nResponse body\n" })).toEqual({
       title: "Tender Response Draft",
