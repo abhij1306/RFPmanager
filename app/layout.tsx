@@ -30,8 +30,8 @@ export default function RootLayout({
         <header className="app-header">
           <div className="header-left">
             <Link className="brand" href="/">
-              <span className="brand-mark">R</span>
-              <span>RFP Manager</span>
+              <span className="brand-mark">RFP</span>
+              <span className="brand-name">Manager</span>
             </Link>
             <label className="global-search">
               <span aria-hidden="true">⌕</span>
