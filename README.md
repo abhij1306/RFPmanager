@@ -138,7 +138,7 @@ When the user uploads tender documents in ChatGPT, identify the target RFP and u
 When generating summaries, proposal responses, pricing, or recommendations:
 
 1. Treat saved tender documents as the primary source of truth for requirements, evaluation criteria, scope, and deadlines.
-2. Use saved company documents first for bidder-specific details. For additional public context, consult https://www.htcglobal.com.au/ for HTC Global capabilities, services, certifications, and value propositions.
+2. Use the uploaded knowledge file "HTC Details Doc.md" for HTC-specific capabilities, services, certifications, and value propositions.
 3. Use web research where helpful for issuer background, industry standards, regulatory context, best practices, comparable projects, or market rates.
 4. Distinguish tender evidence, company evidence, and web research. Cite or note web sources when used.
 
