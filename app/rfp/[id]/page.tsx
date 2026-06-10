@@ -57,7 +57,7 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
       </section>
       {workspaceError ? <div className="notice error">{workspaceError}</div> : null}
       <div className="detail-layout">
-        <RFPForm formId={formId} rfp={rfp} sourceInputId={sourceInputId} />
+        <RFPForm collapsible={true} formId={formId} rfp={rfp} sourceInputId={sourceInputId} />
         <RFPWorkspace comments={comments} documents={documents} files={files} rfp={rfp} />
       </div>
     </div>

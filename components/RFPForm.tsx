@@ -68,11 +68,13 @@ export function RFPForm({
   initialInput,
   rfp,
   sourceInputId = "rfp-source-upload",
+  collapsible = false,
 }: {
   formId?: string;
   initialInput?: RfpInput;
   rfp?: Rfp | null;
   sourceInputId?: string;
+  collapsible?: boolean;
 }) {
   const router = useRouter();
   const [form, setForm] = useState<RfpInput>(() => initialInput ?? inputFromRfp(rfp));
@@ -81,6 +83,7 @@ export function RFPForm({
   const [isSaving, setIsSaving] = useState(false);
   const [sourceFiles, setSourceFiles] = useState<File[]>([]);
   const [sourceUploadProgress, setSourceUploadProgress] = useState("");
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const isEditing = Boolean(rfp);
 
@@ -168,37 +171,24 @@ export function RFPForm({
     }
   }
 
-  return (
-    <form className="rfp-form" id={formId} onSubmit={onSubmit}>
-      {error ? <div className="notice error">{error}</div> : null}
-      {notice ? <div className="notice">{notice}</div> : null}
-      {isEditing ? (
-        <>
-          <input
-            accept={FILE_ACCEPT}
-            className="visually-hidden-file-input"
-            id={sourceInputId}
-            multiple
-            onChange={(event) => setSourceFiles(Array.from(event.target.files ?? []))}
-            ref={sourceInputRef}
-            type="file"
-          />
-          {sourceFiles.length ? (
-            <div className="notice">
-              {sourceFiles.length} source document{sourceFiles.length === 1 ? "" : "s"} selected. Use Save RFP to upload.
-            </div>
-          ) : null}
-        </>
-      ) : null}
-      <section className="form-card">
-        <div className="form-card-heading">
-          <h2>
-            <span aria-hidden="true" className="section-icon">i</span>
-            General info
-          </h2>
+  const formatDateString = (dateStr: string) => {
+    const [year, month, day] = dateStr.split("-");
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  };
+
+  const renderGeneralInfo = () => (
+    <>
+      <div className="form-card-heading">
+        <h2>
+          <span aria-hidden="true" className="section-icon">i</span>
+          General info
+        </h2>
+        {!collapsible && (
           <span className="review-badge">{form.status === "TBD" ? "In review" : form.status}</span>
-        </div>
-        <div className="form-grid">
+        )}
+      </div>
+      <div className="form-grid">
         <div className="form-field">
           <label htmlFor="client_name">Client Name</label>
           <input
@@ -278,17 +268,19 @@ export function RFPForm({
             value={form.gdrive_link ?? ""}
           />
         </div>
-        </div>
-      </section>
+      </div>
+    </>
+  );
 
-      <section className="form-card">
-        <div className="form-card-heading">
-          <h2>
-            <span aria-hidden="true" className="section-icon">□</span>
-            Contact details
-          </h2>
-        </div>
-        <div className="form-grid">
+  const renderContactDetails = () => (
+    <>
+      <div className="form-card-heading">
+        <h2>
+          <span aria-hidden="true" className="section-icon">□</span>
+          Contact details
+        </h2>
+      </div>
+      <div className="form-grid">
         <div className="form-field">
           <label htmlFor="contact_person">Contact Person</label>
           <input
@@ -336,7 +328,105 @@ export function RFPForm({
           />
         </div>
       </div>
-      </section>
+    </>
+  );
+
+  return (
+    <form className={`rfp-form ${collapsible ? "collapsible-rfp-form" : ""}`} id={formId} onSubmit={onSubmit}>
+      {error ? <div className="notice error">{error}</div> : null}
+      {notice ? <div className="notice">{notice}</div> : null}
+      {isEditing ? (
+        <>
+          <input
+            accept={FILE_ACCEPT}
+            className="visually-hidden-file-input"
+            id={sourceInputId}
+            multiple
+            onChange={(event) => setSourceFiles(Array.from(event.target.files ?? []))}
+            ref={sourceInputRef}
+            type="file"
+          />
+          {sourceFiles.length ? (
+            <div className="notice">
+              {sourceFiles.length} source document{sourceFiles.length === 1 ? "" : "s"} selected. Use Save RFP to upload.
+            </div>
+          ) : null}
+        </>
+      ) : null}
+
+      {collapsible ? (
+        <div className="collapsible-rfp-details">
+          <button
+            type="button"
+            className="collapsible-rfp-trigger"
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            aria-expanded={!isCollapsed}
+          >
+            <div className="trigger-left">
+              <span className={`trigger-chevron ${isCollapsed ? "" : "expanded"}`}>▼</span>
+              <span className="trigger-title">
+                {isCollapsed ? "Show RFP Details & Settings" : "Hide RFP Details & Settings"}
+              </span>
+            </div>
+            {isCollapsed && (
+              <div className="trigger-summary">
+                <span className={`summary-item status-badge status-${form.status.toLowerCase().replace(/\s+/g, "-")}`}>
+                  {form.status}
+                </span>
+                <span className="summary-item stage-badge">{form.pipeline_stage}</span>
+                {form.closing_date && (
+                  <span className="summary-item date-badge">
+                    Due: {formatDateString(form.closing_date)}
+                  </span>
+                )}
+                {form.tender_link && (
+                  <span
+                    className="summary-item link-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(form.tender_link!, "_blank", "noopener,noreferrer");
+                    }}
+                    title="Open Tender Link"
+                  >
+                    🔗 Tender
+                  </span>
+                )}
+                {form.gdrive_link && (
+                  <span
+                    className="summary-item link-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      window.open(form.gdrive_link!, "_blank", "noopener,noreferrer");
+                    }}
+                    title="Open Google Drive"
+                  >
+                    📁 Drive
+                  </span>
+                )}
+              </div>
+            )}
+          </button>
+          <div className={`collapsible-rfp-content ${isCollapsed ? "collapsed" : ""}`}>
+            <div className="collapsible-form-grid">
+              <section className="form-card-inline">
+                {renderGeneralInfo()}
+              </section>
+              <section className="form-card-inline">
+                {renderContactDetails()}
+              </section>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <>
+          <section className="form-card">
+            {renderGeneralInfo()}
+          </section>
+          <section className="form-card">
+            {renderContactDetails()}
+          </section>
+        </>
+      )}
 
       {!isEditing ? (
         <section className="form-card">

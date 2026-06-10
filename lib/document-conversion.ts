@@ -150,6 +150,14 @@ function getAllElements(document: Document): Element[] {
   );
 }
 
+function createInlineStringElement(document: Document, cell: Element, text: string): Element {
+  const inlineString = cell.namespaceURI ? document.createElementNS(cell.namespaceURI, "is") : document.createElement("is");
+  const textElement = cell.namespaceURI ? document.createElementNS(cell.namespaceURI, "t") : document.createElement("t");
+  textElement.appendChild(document.createTextNode(text));
+  inlineString.appendChild(textElement);
+  return inlineString;
+}
+
 function wrapUnsupportedInlineStringRuns(xml: string, xmlTools: XmlTools): string {
   const document = xmlTools.parse(xml);
   let changed = false;
@@ -184,16 +192,17 @@ function wrapUnsupportedInlineStringRuns(xml: string, xmlTools: XmlTools): strin
     );
 
     if (inlineChildren.length === 0) {
+      cell.appendChild(createInlineStringElement(document, cell, ""));
+      changed = true;
       continue;
     }
 
-    const normalizedInlineString = cell.namespaceURI
-      ? document.createElementNS(cell.namespaceURI, "is")
-      : document.createElement("is");
-    const textElement = document.createElement("t");
-    textElement.appendChild(document.createTextNode(inlineChildren.map((child) => getTextFromElement(child)).join("")));
+    const normalizedInlineString = createInlineStringElement(
+      document,
+      cell,
+      inlineChildren.map((child) => getTextFromElement(child)).join(""),
+    );
 
-    normalizedInlineString.appendChild(textElement);
     cell.insertBefore(normalizedInlineString, inlineChildren[0]);
     for (const child of inlineChildren) {
       cell.removeChild(child);

@@ -9,7 +9,7 @@ const navItems = [
   { href: "/bookmarklet", label: "Import" },
 ];
 
-const gptUrl = "https://chatgpt.com/g/g-6a204eb74ff0819197b925c02a12e970-rfpmanager";
+const gptUrl = "https://chatgpt.com/g/g-6a29229f32f081918ddc591bc44909fc-rfp-manager";
 
 function isActive(pathname: string, href: string): boolean {
   if (href === "/") {

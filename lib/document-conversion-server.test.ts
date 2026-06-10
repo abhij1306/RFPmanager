@@ -27,7 +27,7 @@ function createWorkbookWithDirectInlineRichText(): ArrayBuffer {
 </Relationships>`),
     "xl/worksheets/sheet1.xml": strToU8(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-  <dimension ref="A1:B2"/>
+  <dimension ref="A1:F6"/>
   <sheetData>
     <row r="1">
       <c r="A1" t="inlineStr"><is><t>Company</t></is></c>
@@ -36,6 +36,10 @@ function createWorkbookWithDirectInlineRichText(): ArrayBuffer {
     <row r="2">
       <c r="A2" t="inlineStr"><is><t>Acme</t></is></c>
       <c r="B2" t="inlineStr"><r><t>Part </t></r><r><t>One</t></r></c>
+    </row>
+    <row r="6">
+      <c r="A6" t="inlineStr"><is><t>Tail row</t></is></c>
+      <c r="F6" t="inlineStr"></c>
     </row>
   </sheetData>
 </worksheet>`),
@@ -55,5 +59,6 @@ describe("document conversion server", () => {
     expect(result.sourceType).toBe("xlsx");
     expect(result.markdown).toContain("## Companies");
     expect(result.markdown).toContain("| Acme | Part One |");
+    expect(result.markdown).toContain("Tail row");
   });
 });

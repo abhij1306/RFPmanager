@@ -422,7 +422,8 @@ main {
 }
 
 .form-card {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   padding: 16px;
   background: var(--panel);
@@ -515,14 +516,176 @@ main {
 }
 
 .detail-layout {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .detail-layout > * {
   min-width: 0;
+}
+
+/* Collapsible RFP Details styles */
+.collapsible-rfp-details {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.collapsible-rfp-details:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.collapsible-rfp-trigger {
+  background: transparent;
+  border: 0;
+  outline: 0;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  transition: background-color 0.16s ease;
+}
+
+.collapsible-rfp-trigger:hover {
+  background-color: var(--soft);
+}
+
+.trigger-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.trigger-chevron {
+  font-size: 11px;
+  color: var(--muted);
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: inline-block;
+}
+
+.trigger-chevron.expanded {
+  transform: rotate(180deg);
+  color: var(--accent);
+}
+
+.trigger-title {
+  font-weight: 750;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.trigger-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: 16px;
+  justify-content: flex-end;
+  flex: 1;
+  min-width: 0;
+}
+
+.summary-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  line-height: 1;
+  border: 1px solid var(--line);
+  color: var(--text);
+  background: var(--surface-raised);
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.summary-item.status-badge {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.02em;
+}
+
+.summary-item.status-tbd {
+  background: #ffdbcd;
+  color: #360f00;
+  border-color: transparent;
+}
+
+.summary-item.status-yes {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: transparent;
+}
+
+.summary-item.status-no {
+  background: #fce8e6;
+  color: #c5221f;
+  border-color: transparent;
+}
+
+.summary-item.link-btn {
+  border-color: var(--line-strong);
+  color: var(--accent);
+  cursor: pointer;
+  background: var(--panel);
+  transition: background-color 0.16s ease, border-color 0.16s ease;
+}
+
+.summary-item.link-btn:hover {
+  background-color: var(--accent-soft);
+  border-color: var(--accent);
+}
+
+.collapsible-rfp-content {
+  border-top: 1px solid var(--line);
+  background: var(--soft);
+}
+
+.collapsible-rfp-content.collapsed {
+  display: none;
+}
+
+.collapsible-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  padding: 18px;
+}
+
+.form-card-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+}
+
+@media (max-width: 960px) {
+  .collapsible-form-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 12px;
+  }
 }
 
 .workspace-panel {
