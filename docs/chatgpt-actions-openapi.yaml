@@ -3,6 +3,9 @@ info:
   title: RFPmanager ChatGPT Actions
   version: 0.2.0
   description: API for listing, creating, reading, and updating RFPmanager opportunities.
+  license:
+    name: MIT
+    identifier: MIT
 
 servers:
   - url: https://rfpmanager.vercel.app
@@ -28,9 +31,24 @@ paths:
           description: Client name, tender code, keyword, or opportunity detail to search for.
           schema:
             type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 25
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         "200":
-          description: List of RFP opportunities.
+          description: Paginated list of RFP opportunities.
           content:
             application/json:
               schema:
@@ -41,11 +59,26 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/Rfp"
+                  total:
+                    type: integer
+                  offset:
+                    type: integer
+                  limit:
+                    type: integer
+                  has_more:
+                    type: boolean
+                  next_offset:
+                    type: ["integer", "null"]
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
     post:
       operationId: createRfp
       summary: Create a new RFP opportunity
       description: Use this only when the user wants to add or create a new RFP record.
+      x-openai-isConsequential: true
       requestBody:
         required: true
         content:
@@ -63,6 +96,12 @@ paths:
                 properties:
                   rfp:
                     $ref: "#/components/schemas/Rfp"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   /api/chatgpt/rfps/{id}:
     get:
@@ -92,6 +131,12 @@ paths:
                 properties:
                   rfp:
                     $ref: "#/components/schemas/Rfp"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
     patch:
       operationId: updateRfp
@@ -101,6 +146,7 @@ paths:
         response. If the user gives a client name, tender code, or description,
         call listRfps with search first. Do not ask for UUIDs unless search is
         ambiguous or empty.
+      x-openai-isConsequential: true
       parameters:
         - name: id
           in: path
@@ -126,6 +172,10 @@ paths:
                 properties:
                   rfp:
                     $ref: "#/components/schemas/Rfp"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "500":
+          $ref: "#/components/responses/ServerError"
 
   /api/chatgpt/rfps/{id}/documents:
     get:
@@ -182,6 +232,10 @@ paths:
                     type: boolean
                   next_offset:
                     type: ["integer", "null"]
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
 
   /api/chatgpt/rfps/{id}/source-files:
     get:
@@ -211,6 +265,10 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/RfpFileWithDownload"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
 
   /api/chatgpt/rfps/{id}/documents/{documentId}:
     get:
@@ -263,6 +321,10 @@ paths:
                 properties:
                   document:
                     $ref: "#/components/schemas/RfpDocumentExcerpt"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
 
   /api/chatgpt/rfps/{id}/documents/convert:
     post:
@@ -305,6 +367,12 @@ paths:
                           $ref: "#/components/schemas/RfpDocumentSummary"
                         source_file:
                           $ref: "#/components/schemas/RfpFile"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
 
   /api/chatgpt/rfps/{id}/summary:
     post:
@@ -346,6 +414,12 @@ paths:
                     $ref: "#/components/schemas/Rfp"
                   summary:
                     type: ["string", "null"]
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
 
   /api/chatgpt/rfps/{id}/responses:
     get:
@@ -373,6 +447,10 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/RfpFileWithDownload"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
 
     post:
       operationId: saveRfpResponses
@@ -409,6 +487,12 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/RfpFile"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
 
   /api/chatgpt/rfps/{id}/responses/text:
     post:
@@ -457,6 +541,12 @@ paths:
                     $ref: "#/components/schemas/Rfp"
                   response_draft:
                     $ref: "#/components/schemas/RfpResponseDraft"
+        "400":
+          $ref: "#/components/responses/BadRequestError"
+        "401":
+          $ref: "#/components/responses/UnauthorizedError"
+        "404":
+          $ref: "#/components/responses/NotFoundError"
 
 components:
   securitySchemes:
@@ -465,7 +555,42 @@ components:
       scheme: bearer
       description: Shared API key sent as a bearer token in the Authorization header.
 
+  responses:
+    BadRequestError:
+      description: Invalid request payload or unsupported file.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    UnauthorizedError:
+      description: Missing or invalid ChatGPT Actions API key.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFoundError:
+      description: Requested RFP or document was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    ServerError:
+      description: Unexpected server or database error.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
   schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required:
+        - error
+      properties:
+        error:
+          type: string
+
     Rfp:
       type: object
       additionalProperties: false
@@ -478,6 +603,7 @@ components:
         status:
           type: string
           enum: ["Yes", "No", "TBD"]
+          description: Bid decision only. This is separate from pipeline_stage.
         closing_date:
           type: ["string", "null"]
           description: ISO date in YYYY-MM-DD format, if available.
@@ -520,6 +646,7 @@ components:
         pipeline_stage:
           type: string
           enum: ["Prospects", "Active", "Submitted", "Won", "Lost"]
+          description: Workflow stage only. This is separate from the Yes/No/TBD bid decision in status.
         created_at:
           type: string
 
@@ -538,7 +665,29 @@ components:
           minItems: 1
           maxItems: 10
           items:
-            type: string
+            $ref: "#/components/schemas/OpenAiFileRef"
+
+    OpenAiFileRef:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - name
+        - download_link
+      properties:
+        id:
+          type: string
+          description: OpenAI file id from the ChatGPT conversation.
+        name:
+          type: string
+          description: File name from the ChatGPT conversation.
+        mime_type:
+          type: ["string", "null"]
+          description: MIME type from ChatGPT when available.
+        download_link:
+          type: string
+          format: uri
+          description: Temporary download URL populated by ChatGPT at action runtime.
 
     RfpResponseDraft:
       type: object
@@ -550,31 +699,6 @@ components:
           type: ["string", "null"]
         saved_at:
           type: ["string", "null"]
-
-    RfpDocument:
-      type: object
-      additionalProperties: false
-      properties:
-        id:
-          type: string
-          format: uuid
-        rfp_id:
-          type: string
-          format: uuid
-        source_file_id:
-          type: ["string", "null"]
-          format: uuid
-        title:
-          type: string
-        source_filename:
-          type: ["string", "null"]
-        source_type:
-          type: string
-          enum: ["docx", "pdf", "xlsx", "csv", "markdown"]
-        markdown:
-          type: string
-        created_at:
-          type: string
 
     RfpDocumentSummary:
       type: object
@@ -608,21 +732,51 @@ components:
           type: string
 
     RfpDocumentExcerpt:
-      allOf:
-        - $ref: "#/components/schemas/RfpDocumentSummary"
-        - type: object
-          additionalProperties: false
-          properties:
-            markdown:
-              type: string
-            offset:
-              type: integer
-            limit:
-              type: integer
-            next_offset:
-              type: ["integer", "null"]
-            has_more:
-              type: boolean
+      type: object
+      additionalProperties: false
+      required:
+        - markdown
+        - offset
+        - limit
+        - next_offset
+        - has_more
+      properties:
+        id:
+          type: string
+          format: uuid
+        rfp_id:
+          type: string
+          format: uuid
+        source_file_id:
+          type: ["string", "null"]
+          format: uuid
+        title:
+          type: string
+          maxLength: 200
+        source_filename:
+          type: ["string", "null"]
+          maxLength: 255
+        source_type:
+          type: string
+          enum: ["docx", "pdf", "xlsx", "csv", "markdown"]
+        markdown_length:
+          type: integer
+        markdown_preview:
+          type: string
+          maxLength: 500
+          description: First 500 characters only.
+        created_at:
+          type: string
+        markdown:
+          type: string
+        offset:
+          type: integer
+        limit:
+          type: integer
+        next_offset:
+          type: ["integer", "null"]
+        has_more:
+          type: boolean
 
     RfpFile:
       type: object
@@ -655,21 +809,45 @@ components:
           type: string
         created_at:
           type: string
-        download_url:
-          type: string
-          format: uri
 
     RfpFileWithDownload:
-      allOf:
-        - $ref: "#/components/schemas/RfpFile"
-        - type: object
-          additionalProperties: false
-          properties:
-            download_url:
-              type: ["string", "null"]
-              format: uri
-            download_error:
-              type: string
+      type: object
+      additionalProperties: false
+      required:
+        - download_url
+      properties:
+        id:
+          type: string
+          format: uuid
+        rfp_id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: ["source", "response"]
+        title:
+          type: string
+        original_filename:
+          type: string
+        mime_type:
+          type: ["string", "null"]
+        storage_path:
+          type: string
+        file_size_bytes:
+          type: ["integer", "null"]
+        status:
+          type: ["string", "null"]
+        notes:
+          type: ["string", "null"]
+        created_by:
+          type: string
+        created_at:
+          type: string
+        download_url:
+          type: ["string", "null"]
+          format: uri
+        download_error:
+          type: string
 
     RfpInput:
       type: object
@@ -683,6 +861,7 @@ components:
           type: string
           enum: ["Yes", "No", "TBD"]
           default: "TBD"
+          description: Bid decision only. This does not determine pipeline_stage.
         closing_date:
           type: ["string", "null"]
           description: ISO date in YYYY-MM-DD format.
@@ -709,6 +888,7 @@ components:
           type: string
           enum: ["Prospects", "Active", "Submitted", "Won", "Lost"]
           default: "Prospects"
+          description: Workflow stage only. This does not determine status.
 
     RfpUpdate:
       type: object
@@ -719,8 +899,12 @@ components:
         status:
           type: string
           enum: ["Yes", "No", "TBD"]
+          description: Bid decision only. This does not determine pipeline_stage.
         closing_date:
           type: ["string", "null"]
+        closing_date_text:
+          type: ["string", "null"]
+          description: Human-readable closing date. The API parses this into closing_date when closing_date is omitted.
         tender_code:
           type: ["string", "null"]
         tender_link:
@@ -740,3 +924,4 @@ components:
         pipeline_stage:
           type: string
           enum: ["Prospects", "Active", "Submitted", "Won", "Lost"]
+          description: Workflow stage only. This does not determine status.

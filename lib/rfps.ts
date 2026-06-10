@@ -1,5 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
-import type { Rfp, RfpImportInput, RfpInput, TenderDocumentLink } from "@/lib/types";
+import type { Rfp, RfpImportInput, RfpInput, RfpUpdateInput, TenderDocumentLink } from "@/lib/types";
 
 const selectFields =
   "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, contact_person, contact_phone, contact_email, document_links, summary, summary_generated_at, response_draft_title, response_draft_content, response_draft_saved_at, notes, pipeline_stage, created_at";
@@ -109,6 +109,23 @@ export function normalizeImportedRfp(input: RfpImportInput): RfpInput {
     notes: input.notes ?? null,
     pipeline_stage: input.pipeline_stage ?? "Prospects",
   };
+}
+
+export function normalizeRfpUpdate(input: RfpUpdateInput): Partial<RfpInput> {
+  const { closing_date_text: closingDateText, ...fields } = input;
+  const update = Object.fromEntries(
+    Object.entries(fields).filter(([, value]) => value !== undefined),
+  ) as Partial<RfpInput>;
+
+  if (!("closing_date" in update) && closingDateText) {
+    const parsedClosingDate = parseClosingDate(closingDateText);
+
+    if (parsedClosingDate) {
+      update.closing_date = parsedClosingDate;
+    }
+  }
+
+  return update;
 }
 
 export async function listRfps(): Promise<Rfp[]> {

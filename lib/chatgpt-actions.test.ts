@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Rfp, RfpDocument } from "@/lib/types";
 import { createDocumentExcerpt, paginateDocumentSummaries, toDocumentSummary } from "@/lib/chatgpt-documents";
-import { filterRfpsForChatgpt } from "@/lib/chatgpt-rfps";
+import { filterRfpsForChatgpt, paginateRfpsForChatgpt } from "@/lib/chatgpt-rfps";
 import { toSourceFileSummaries } from "@/lib/chatgpt-source-files";
 
 const document: RfpDocument = {
@@ -81,6 +81,19 @@ describe("ChatGPT action helpers", () => {
     expect(filterRfpsForChatgpt([rfp], "renewal")).toHaveLength(1);
     expect(filterRfpsForChatgpt([rfp], "priority")).toHaveLength(1);
     expect(filterRfpsForChatgpt([rfp], "missing")).toHaveLength(0);
+  });
+
+  it("paginates RFPs for ChatGPT with a bounded default page size", () => {
+    const rfps = Array.from({ length: 35 }, (_, index) => ({ ...rfp, id: `rfp-${index}` }));
+
+    const page = paginateRfpsForChatgpt(rfps, { offset: 10, limit: 50 });
+
+    expect(page.rfps).toHaveLength(25);
+    expect(page.total).toBe(35);
+    expect(page.offset).toBe(10);
+    expect(page.limit).toBe(25);
+    expect(page.has_more).toBe(false);
+    expect(page.next_offset).toBeNull();
   });
 
   it("keeps source file metadata when signed URL creation fails", async () => {

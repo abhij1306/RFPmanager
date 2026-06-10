@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildBookmarklet } from "@/lib/bookmarklet";
-import { normalizeImportedRfp } from "@/lib/rfps";
+import { normalizeImportedRfp, normalizeRfpUpdate } from "@/lib/rfps";
 
 describe("RFP imports", () => {
   afterEach(() => {
@@ -19,6 +19,18 @@ describe("RFP imports", () => {
     expect(input.contact_person).toBe("Naomi Boardman");
     expect(input.contact_phone).toBe("(08) 65511421");
     expect(input.contact_email).toBe("naomi.boardman@dohw.wa.gov.au");
+  });
+
+  it("parses human-readable closing dates in partial RFP updates", () => {
+    expect(normalizeRfpUpdate({ closing_date_text: "Closes 15 July 2026" })).toEqual({
+      closing_date: "2026-07-15",
+    });
+  });
+
+  it("does not apply create defaults to partial RFP updates", () => {
+    expect(normalizeRfpUpdate({ client_name: "Library Management System" })).toEqual({
+      client_name: "Library Management System",
+    });
   });
 
   it("includes enquiry contact fields in the generated bookmarklet payload", () => {

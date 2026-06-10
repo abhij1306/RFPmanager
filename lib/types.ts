@@ -55,6 +55,10 @@ export type RfpImportInput = Partial<RfpInput> & {
   closing_date_text?: string | null;
 };
 
+export type RfpUpdateInput = Partial<RfpInput> & {
+  closing_date_text?: string | null;
+};
+
 export type RfpDocumentSourceType = "docx" | "pdf" | "xlsx" | "csv" | "markdown";
 export type RfpFileKind = "source" | "response";
 
