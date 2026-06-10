@@ -33,6 +33,39 @@ describe("ChatGPT file helpers", () => {
     ]);
   });
 
+  it("normalizes generated file references with camelCase and URL aliases", () => {
+    expect(
+      normalizeOpenAiFileRefs({
+        openaiFileIdRefs: [
+          {
+            file_id: "file-456",
+            filename: "Proposal.docx",
+            mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            downloadLink: "https://files.example.test/proposal.docx",
+          },
+          {
+            id: "file-789",
+            title: "Pricing.xlsx",
+            download_url: "https://files.example.test/pricing.xlsx",
+          },
+        ],
+      }),
+    ).toEqual([
+      {
+        id: "file-456",
+        name: "Proposal.docx",
+        mimeType: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        downloadLink: "https://files.example.test/proposal.docx",
+      },
+      {
+        id: "file-789",
+        name: "Pricing.xlsx",
+        mimeType: null,
+        downloadLink: "https://files.example.test/pricing.xlsx",
+      },
+    ]);
+  });
+
   it("detects supported source document types", () => {
     expect(getAllowedFileSourceType("response.DOCX")).toBe("docx");
     expect(getAllowedFileSourceType("pricing.xlsx")).toBe("xlsx");

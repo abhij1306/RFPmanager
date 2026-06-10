@@ -16,9 +16,18 @@ export type OpenAiFileRef = {
 
 type RawOpenAiFileRef = {
   id?: unknown;
+  file_id?: unknown;
+  fileId?: unknown;
   name?: unknown;
+  filename?: unknown;
+  file_name?: unknown;
+  title?: unknown;
   mime_type?: unknown;
+  mimeType?: unknown;
   download_link?: unknown;
+  downloadLink?: unknown;
+  download_url?: unknown;
+  url?: unknown;
 };
 
 export function getAllowedFileSourceType(filename: string): RfpDocumentSourceType {
@@ -52,25 +61,32 @@ export function normalizeOpenAiFileRefs(payload: unknown): OpenAiFileRef[] {
 
   return refs.map((item, index) => {
     const ref = item as RawOpenAiFileRef;
+    const id = firstString(ref.id, ref.file_id, ref.fileId);
+    const name = firstString(ref.name, ref.filename, ref.file_name, ref.title);
+    const mimeType = firstString(ref.mime_type, ref.mimeType);
+    const downloadLink = firstString(ref.download_link, ref.downloadLink, ref.download_url, ref.url);
 
-    if (
-      typeof ref.id !== "string" ||
-      typeof ref.name !== "string" ||
-      typeof ref.download_link !== "string" ||
-      !ref.id.trim() ||
-      !ref.name.trim() ||
-      !ref.download_link.trim()
-    ) {
-      throw new Error(`openaiFileIdRefs[${index}] must include id, name, and download_link.`);
+    if (!id || !name || !downloadLink) {
+      throw new Error(`openaiFileIdRefs[${index}] must include a file id, name, and download link.`);
     }
 
     return {
-      id: ref.id.trim(),
-      name: ref.name.trim(),
-      mimeType: typeof ref.mime_type === "string" && ref.mime_type.trim() ? ref.mime_type.trim() : null,
-      downloadLink: ref.download_link.trim(),
+      id,
+      name,
+      mimeType: mimeType || null,
+      downloadLink,
     };
   });
+}
+
+function firstString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
 }
 
 export function validateSummaryInput(payload: unknown): string {

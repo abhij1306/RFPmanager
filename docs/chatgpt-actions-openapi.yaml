@@ -661,7 +661,9 @@ components:
           description: >
             One to ten files from the ChatGPT conversation. The parameter name must be openaiFileIdRefs.
             Use for user-uploaded, ChatGPT-generated, or Code Interpreter-created files.
-            Runtime items include id, name, mime_type, and download_link.
+            Runtime items should include a file id, file name, and temporary download link.
+            The API accepts common aliases such as id/file_id/fileId, name/filename/file_name/title,
+            mime_type/mimeType, and download_link/downloadLink/download_url/url.
           minItems: 1
           maxItems: 10
           items:
@@ -669,25 +671,55 @@ components:
 
     OpenAiFileRef:
       type: object
-      additionalProperties: false
-      required:
-        - id
-        - name
-        - download_link
+      additionalProperties: true
+      description: >
+        A ChatGPT file reference. Include a file id, file name, and temporary download link.
+        Preferred fields are id, name, mime_type, and download_link, but the API also accepts
+        common generated-file aliases.
       properties:
         id:
           type: string
           description: OpenAI file id from the ChatGPT conversation.
+        file_id:
+          type: string
+          description: Alias for id.
+        fileId:
+          type: string
+          description: Alias for id.
         name:
           type: string
           description: File name from the ChatGPT conversation.
+        filename:
+          type: string
+          description: Alias for name.
+        file_name:
+          type: string
+          description: Alias for name.
+        title:
+          type: string
+          description: Alias for name.
         mime_type:
           type: ["string", "null"]
           description: MIME type from ChatGPT when available.
+        mimeType:
+          type: ["string", "null"]
+          description: Alias for mime_type.
         download_link:
           type: string
           format: uri
           description: Temporary download URL populated by ChatGPT at action runtime.
+        downloadLink:
+          type: string
+          format: uri
+          description: Alias for download_link.
+        download_url:
+          type: string
+          format: uri
+          description: Alias for download_link.
+        url:
+          type: string
+          format: uri
+          description: Alias for download_link.
 
     RfpResponseDraft:
       type: object
