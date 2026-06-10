@@ -206,6 +206,10 @@ If you later need per-user access, audit trails, or stronger isolation, replace 
 
 Open `/bookmarklet`, copy the generated bookmarklet, and paste it into a browser bookmark URL. On a tender page, click the bookmark to send tender details and document links to `/api/rfp`; the app creates the RFP and opens its detail page.
 
+For login-only portals, install the Debug Tender bookmarklet from `/bookmarklet`. Ask the assistant to open a real tender detail page after logging in, click Debug Tender, and save the copied JSON report. The report redacts emails, phone numbers, and URL query values, but still shows headings, labels, table rows, and document link patterns needed to improve extraction rules.
+
+Good first debug targets are VendorPanel, Australian Tenders, TenderLink, SA Tenders, ACT Tenders, and VIC Tenders. Public/search-first portals such as AusTender, WA Tenders, GETS, NSW Buy, Queensland, and NT can usually be improved from visible tender detail pages plus the generic extractor.
+
 ## Scripts
 
 ```bash

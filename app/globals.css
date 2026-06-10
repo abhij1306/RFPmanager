@@ -1091,6 +1091,14 @@ main {
   word-break: break-all;
 }
 
+.bookmarklet-code-small {
+  min-height: 180px;
+}
+
+.bookmarklet-debug-panel {
+  grid-column: 1 / -1;
+}
+
 .steps-list {
   margin: 0;
   padding-left: 20px;
