@@ -376,10 +376,11 @@ paths:
 
     post:
       operationId: saveRfpResponses
-      summary: Upload GPT-created response files for one RFP
+      summary: Save GPT-created response files to one RFP
       description: >
-        Use this after the GPT creates response files such as PDF, DOCX, or XLSX outputs.
-        The request must include openaiFileIdRefs; ChatGPT will populate each item with a temporary download_link.
+        Use after creating response files in ChatGPT, including DOCX, PDF, XLSX, CSV,
+        Markdown, or TXT outputs. This stores generated proposal files under the selected
+        RFP. For plain editable response text, use saveRfpResponseDraft instead.
       x-openai-isConsequential: true
       parameters:
         - name: id
@@ -532,7 +533,8 @@ components:
           type: array
           description: >
             One to ten files from the ChatGPT conversation. The parameter name must be openaiFileIdRefs.
-            At runtime ChatGPT populates each item with id, name, mime_type, and a temporary download_link.
+            Use for user-uploaded, ChatGPT-generated, or Code Interpreter-created files.
+            Runtime items include id, name, mime_type, and download_link.
           minItems: 1
           maxItems: 10
           items:
