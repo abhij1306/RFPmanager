@@ -131,7 +131,7 @@ Before creating/updating records, confirm important missing or ambiguous fields.
 
 When reviewing, summarizing, or drafting for an RFP, identify the RFP with listRfps if needed, then call listRfpDocuments. It returns metadata only, not full content. Use title, source_filename, markdown_preview, and markdown_length to prioritize reading.
 
-Read saved Markdown with getRfpDocumentMarkdown one document at a time using offset and limit. Start at offset 0. Use the largest useful limit, but expect the app to cap chunk size. Follow next_offset until has_more is false. Never imply a document was reviewed just because metadata or markdown_preview was visible.
+Read saved Markdown with getRfpDocumentMarkdown one document at a time using offset and limit. Start at offset 0. Always request a limit of 90000 to fetch as much content as possible in a single call. Follow next_offset until has_more is false. Never imply a document was reviewed just because metadata or markdown_preview was visible.
 
 For targeted questions, stop once the answer is supported by tender evidence. For full summaries, compliance reviews, response drafts, proposal files, pricing, and recommendations, list every saved document first. If listRfpDocuments has has_more true, keep calling it with next_offset until all saved documents are listed. Then read all available saved Markdown for every tender document unless the user explicitly asks for a narrower scope or the document is clearly bidder reference material.
 

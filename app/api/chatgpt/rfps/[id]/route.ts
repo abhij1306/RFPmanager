@@ -1,11 +1,7 @@
 import { NextResponse } from "next/server";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
-import { getSupabase } from "@/lib/supabase";
-import { normalizeRfpUpdate } from "@/lib/rfps";
+import { getRfp, normalizeRfpUpdate, updateRfp } from "@/lib/rfps";
 import type { RfpUpdateInput } from "@/lib/types";
-
-const selectFields =
-  "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, contact_person, contact_phone, contact_email, document_links, summary, summary_generated_at, response_draft_title, response_draft_content, response_draft_saved_at, notes, pipeline_stage, created_at";
 
 export const dynamic = "force-dynamic";
 
@@ -16,19 +12,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return chatgptAuthErrorResponse(validation);
   }
 
-  const { id } = await params;
-  const supabase = getSupabase();
-  const { data, error } = await supabase.from("rfps").select(selectFields).eq("id", id).maybeSingle();
+  try {
+    const { id } = await params;
+    const rfp = await getRfp(id);
 
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    if (!rfp) {
+      return NextResponse.json({ error: "RFP not found." }, { status: 404 });
+    }
+
+    return NextResponse.json({ rfp });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not load RFP." }, { status: 500 });
   }
-
-  if (!data) {
-    return NextResponse.json({ error: "RFP not found." }, { status: 404 });
-  }
-
-  return NextResponse.json({ rfp: data });
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -41,14 +36,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   try {
     const { id } = await params;
     const payload = normalizeRfpUpdate((await request.json()) as RfpUpdateInput);
-    const supabase = getSupabase();
-    const { data, error } = await supabase.from("rfps").update(payload).eq("id", id).select(selectFields).single();
+    const rfp = await updateRfp(id, payload);
 
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ rfp: data });
+    return NextResponse.json({ rfp });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Could not update RFP." },

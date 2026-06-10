@@ -1,4 +1,4 @@
-import type { RfpDocumentSourceType } from "@/lib/types";
+export { getAllowedFileSourceType } from "@/lib/document-conversion-core";
 
 export class ValidationError extends Error {
   constructor(message: string) {
@@ -29,24 +29,6 @@ type RawOpenAiFileRef = {
   download_url?: unknown;
   url?: unknown;
 };
-
-export function getAllowedFileSourceType(filename: string): RfpDocumentSourceType {
-  const extension = filename.split(".").pop()?.toLowerCase();
-
-  if (extension === "docx" || extension === "pdf" || extension === "xlsx" || extension === "csv") {
-    return extension;
-  }
-
-  if (extension === "md" || extension === "markdown" || extension === "txt") {
-    return "markdown";
-  }
-
-  if (extension === "xls") {
-    throw new Error("Legacy XLS files are not supported. Save the spreadsheet as XLSX or CSV first.");
-  }
-
-  throw new Error("Upload a DOCX, PDF, XLSX, CSV, MD, Markdown, or TXT file.");
-}
 
 export function normalizeOpenAiFileRefs(payload: unknown): OpenAiFileRef[] {
   const refs = (payload as { openaiFileIdRefs?: unknown })?.openaiFileIdRefs;

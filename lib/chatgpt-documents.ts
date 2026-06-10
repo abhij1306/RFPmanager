@@ -3,8 +3,8 @@ import type { RfpDocument } from "@/lib/types";
 export const DEFAULT_MARKDOWN_PREVIEW_LENGTH = 500;
 export const DEFAULT_DOCUMENT_LIST_LIMIT = 10;
 export const MAX_DOCUMENT_LIST_LIMIT = 20;
-export const DEFAULT_MARKDOWN_EXCERPT_LENGTH = 6000;
-export const MAX_MARKDOWN_EXCERPT_LENGTH = 12000;
+export const DEFAULT_MARKDOWN_EXCERPT_LENGTH = 45000;
+export const MAX_MARKDOWN_EXCERPT_LENGTH = 90000;
 
 export type RfpDocumentSummary = Omit<RfpDocument, "markdown"> & {
   markdown_length: number;

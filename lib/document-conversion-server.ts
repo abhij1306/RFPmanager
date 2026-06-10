@@ -1,18 +1,12 @@
-import TurndownService from "turndown";
-import { getAllowedFileSourceType } from "@/lib/chatgpt-files";
-import { cleanConvertedMarkdown, removeHtmlImages } from "@/lib/document-markdown-cleanup";
+import { cleanConvertedMarkdown } from "@/lib/document-markdown-cleanup";
 import {
+  getAllowedFileSourceType,
+  htmlToMarkdown,
   normalizeXlsxInlineStrings,
   parseCsv,
   sheetRowsToMarkdown,
   type ConversionResult,
-} from "@/lib/document-conversion";
-
-function htmlToMarkdown(html: string): string {
-  const turndown = new TurndownService({ headingStyle: "atx", codeBlockStyle: "fenced" });
-  turndown.remove("img");
-  return cleanConvertedMarkdown(turndown.turndown(removeHtmlImages(html)));
-}
+} from "@/lib/document-conversion-core";
 
 async function convertDocxBuffer(buffer: ArrayBuffer): Promise<string> {
   const mammoth = await import("mammoth");
