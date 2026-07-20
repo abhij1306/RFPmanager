@@ -7,6 +7,11 @@ const metadataSelectFields = "id, rfp_id, source_file_id, title, source_filename
 const helpers = createTableHelpers<RfpDocument, RfpDocumentInput>("rfp_documents", selectFields);
 const metadataHelpers = createTableHelpers<RfpDocument, RfpDocumentInput>("rfp_documents", metadataSelectFields);
 
+export type RfpDocumentPage = {
+  documents: RfpDocument[];
+  totalCount: number;
+};
+
 export const listDocuments = helpers.list;
 
 export const listDocumentsByRfp = helpers.listByRfp;
@@ -15,6 +20,33 @@ export const listDocumentsByRfp = helpers.listByRfp;
 export async function listDocumentMetadataByRfp(rfpId: string): Promise<RfpDocument[]> {
   const rows = await metadataHelpers.listByRfp(rfpId);
   return rows.map((row) => ({ ...row, markdown: "" }));
+}
+
+export async function listDocumentMetadataPage({
+  limit = 25,
+  offset = 0,
+  rfpId,
+}: {
+  limit?: number;
+  offset?: number;
+  rfpId?: string;
+} = {}): Promise<RfpDocumentPage> {
+  const supabase = getSupabase();
+  let query = supabase
+    .from("rfp_documents")
+    .select(metadataSelectFields, { count: "exact" })
+    .order("created_at", { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (rfpId) query = query.eq("rfp_id", rfpId);
+
+  const { count, data, error } = await query;
+  if (error) throw error;
+
+  return {
+    documents: ((data ?? []) as RfpDocument[]).map((row) => ({ ...row, markdown: "" })),
+    totalCount: count ?? 0,
+  };
 }
 
 export const createDocument = helpers.create;

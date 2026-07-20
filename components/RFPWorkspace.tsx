@@ -99,11 +99,13 @@ function deriveWorkspaceDocuments(rfp: Rfp, documentList: RfpDocument[], fileLis
 
 export function RFPWorkspace({
   comments,
+  documentTotalCount: initialDocumentTotalCount,
   documents,
   files,
   rfp,
 }: {
   comments: RfpComment[];
+  documentTotalCount: number;
   documents: RfpDocument[];
   files: RfpFile[];
   rfp: Rfp;
@@ -111,6 +113,7 @@ export function RFPWorkspace({
   // ── State ─────────────────────────────────────────────────────────────────
   const [commentList, setCommentList] = useState(comments);
   const [documentList, setDocumentList] = useState(documents);
+  const [documentTotalCount, setDocumentTotalCount] = useState(initialDocumentTotalCount);
   const [fileList, setFileList] = useState(files);
   const [commentBody, setCommentBody] = useState("");
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
@@ -137,6 +140,7 @@ export function RFPWorkspace({
   const [showConverter, setShowConverter] = useState(false);
   const [documentMarkdown, setDocumentMarkdown] = useState<Record<string, string>>({});
   const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null);
+  const [isLoadingMoreDocuments, setIsLoadingMoreDocuments] = useState(false);
   const loadingDocumentIdsRef = useRef(new Set<string>());
   const urlReadyRef = useRef(false);
 
@@ -194,6 +198,31 @@ export function RFPWorkspace({
     if (!response.ok) throw new Error(data.error ?? "Could not load document content.");
     return data.document?.markdown ?? "";
   }, [rfp.id]);
+
+  const requestDocumentPage = useCallback(async (offset: number): Promise<{ documents: RfpDocument[]; totalCount: number }> => {
+    const response = await fetch(`/api/rfp/${rfp.id}/documents?offset=${offset}&limit=25`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error ?? "Could not load more documents.");
+    return data;
+  }, [rfp.id]);
+
+  async function loadMoreDocuments() {
+    if (isLoadingMoreDocuments || documentList.length >= documentTotalCount) return;
+    setIsLoadingMoreDocuments(true);
+    try {
+      const page = await requestDocumentPage(documentList.length);
+      setDocumentList((current) => {
+        const currentIds = new Set(current.map((document) => document.id));
+        return [...current, ...page.documents.filter((document) => !currentIds.has(document.id))];
+      });
+      setDocumentTotalCount(page.totalCount);
+    } catch (error) {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not load more documents.");
+    } finally {
+      setIsLoadingMoreDocuments(false);
+    }
+  }
 
   const loadDocumentMarkdown = useCallback(async (document: RfpDocument): Promise<string> => {
     if (document.markdown) return document.markdown;
@@ -298,6 +327,7 @@ export function RFPWorkspace({
     try {
       await deleteDocument(id);
       setDocumentList((current) => current.filter((document) => document.id !== id));
+      setDocumentTotalCount((current) => Math.max(0, current - 1));
       if (selectedDocumentId === `document-${id}`) {
         const nextDocument = documentList.find((document) => document.id !== id);
         setSelectedDocumentId(nextDocument ? `document-${nextDocument.id}` : null);
@@ -402,6 +432,7 @@ export function RFPWorkspace({
       const nextDocuments = [...savedDocuments, ...documentList];
 
       setDocumentList(nextDocuments);
+      setDocumentTotalCount((current) => current + savedDocuments.length);
       setFileList((current) => [...savedFiles, ...current]);
       if (savedDocuments[0]) setSelectedDocumentId(`document-${savedDocuments[0].id}`);
       setMessage(`${saved.length} source document${saved.length === 1 ? "" : "s"} saved with converted markdown.`);
@@ -415,14 +446,31 @@ export function RFPWorkspace({
     }
   }
 
+  async function getDocumentsForSummary(currentDocuments: RfpDocument[]): Promise<RfpDocument[]> {
+    if (currentDocuments.length >= documentTotalCount) return currentDocuments;
+
+    const allDocuments: RfpDocument[] = [];
+    let offset = 0;
+    let totalCount = documentTotalCount;
+    while (offset < totalCount) {
+      const page = await requestDocumentPage(offset);
+      allDocuments.push(...page.documents);
+      totalCount = page.totalCount;
+      if (page.documents.length === 0) break;
+      offset += page.documents.length;
+    }
+    return allDocuments;
+  }
+
   async function generateSummary(documentsToSummarize = documentList) {
     setIsSummarizing(true);
     setMessage(null);
     setMessageType("info");
     let documentsWithMarkdown: RfpDocument[];
     try {
+      const documentsForSummary = await getDocumentsForSummary(documentsToSummarize);
       documentsWithMarkdown = await Promise.all(
-        documentsToSummarize.map(async (document) => ({
+        documentsForSummary.map(async (document) => ({
           ...document,
           markdown: document.markdown || documentMarkdown[document.id] || (await requestDocumentMarkdown(document.id)),
         })),
@@ -500,6 +548,7 @@ export function RFPWorkspace({
       });
       const nextDocuments = [saved, ...documentList];
       setDocumentList(nextDocuments);
+      setDocumentTotalCount((current) => current + 1);
       setSelectedDocumentId(`document-${saved.id}`);
       setMarkdownDraft("");
       setMarkdownTitle("");
@@ -581,7 +630,7 @@ export function RFPWorkspace({
         <div className="documents-workspace">
           <section aria-label="Document navigator" className="document-navigator">
             <div className="navigator-heading">
-              <div><h2>Document library</h2><p>{workspaceDocuments.length} items · {documentList.length} converted</p></div>
+              <div><h2>Document library</h2><p>{workspaceDocuments.length} items · {documentList.length} of {documentTotalCount} converted loaded</p></div>
               <button className="ghost-button compact-button" disabled={isBulkUploading} onClick={() => bulkSourceInputRef.current?.click()} type="button">
                 {isBulkUploading ? `Saving ${bulkProgress}` : "Bulk upload"}
               </button>
@@ -606,6 +655,7 @@ export function RFPWorkspace({
                   ))}
                 </div>
               ))}
+              {documentList.length < documentTotalCount ? <button className="load-more-button" disabled={isLoadingMoreDocuments} onClick={() => void loadMoreDocuments()} type="button">{isLoadingMoreDocuments ? "Loading documents…" : `Load more documents (${documentTotalCount - documentList.length} remaining)`}</button> : null}
               {documentGroups.length === 0 ? <div className="empty-library">No documents match this view.</div> : null}
             </div>
           </section>

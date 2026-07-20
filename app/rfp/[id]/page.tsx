@@ -3,7 +3,7 @@ import { RFPForm } from "@/components/RFPForm";
 import { RFPHeaderActions } from "@/components/RFPHeaderActions";
 import { RFPWorkspace } from "@/components/RFPWorkspace";
 import { listCommentsByRfp } from "@/lib/comments";
-import { listDocumentMetadataByRfp } from "@/lib/documents";
+import { listDocumentMetadataPage } from "@/lib/documents";
 import { listFilesByRfp } from "@/lib/rfp-files";
 import { getRfp } from "@/lib/rfps";
 import type { RfpComment, RfpDocument, RfpFile } from "@/lib/types";
@@ -19,12 +19,21 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
   }
 
   let documents: RfpDocument[] = [];
+  let documentTotalCount = 0;
   let files: RfpFile[] = [];
   let comments: RfpComment[] = [];
   let workspaceError: string | null = null;
 
   try {
-    [documents, files, comments] = await Promise.all([listDocumentMetadataByRfp(id), listFilesByRfp(id), listCommentsByRfp(id)]);
+    const [documentPage, loadedFiles, loadedComments] = await Promise.all([
+      listDocumentMetadataPage({ limit: 25, rfpId: id }),
+      listFilesByRfp(id),
+      listCommentsByRfp(id),
+    ]);
+    documents = documentPage.documents;
+    documentTotalCount = documentPage.totalCount;
+    files = loadedFiles;
+    comments = loadedComments;
   } catch (loadError) {
     workspaceError = loadError instanceof Error ? loadError.message : "Could not load RFP workspace.";
   }
@@ -54,18 +63,14 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
           ) : (
             <div>{titleContent}</div>
           )}
-          <div aria-label="RFP status" className="project-status-row">
-            <span className={`status status-${rfp.status.toLowerCase()}`}>{rfp.status}</span>
-            <span className="project-stage">{rfp.pipeline_stage}</span>
-            {rfp.closing_date ? <span className="project-deadline">Due {rfp.closing_date}</span> : null}
-          </div>
+
         </div>
         <RFPHeaderActions formId={formId} gdriveLink={rfp.gdrive_link} rfpId={rfp.id} sourceInputId={sourceInputId} />
       </section>
       {workspaceError ? <div className="notice error">{workspaceError}</div> : null}
       <div className="detail-layout">
         <RFPForm collapsible={true} formId={formId} rfp={rfp} sourceInputId={sourceInputId} />
-        <RFPWorkspace comments={comments} documents={documents} files={files} rfp={rfp} />
+        <RFPWorkspace comments={comments} documentTotalCount={documentTotalCount} documents={documents} files={files} rfp={rfp} />
       </div>
     </div>
   );
