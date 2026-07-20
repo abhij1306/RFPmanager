@@ -140,7 +140,6 @@ export function RFPWorkspace({
   const sourceInputRef = useRef<HTMLInputElement>(null);
   const bulkSourceInputRef = useRef<HTMLInputElement>(null);
   const responseInputRef = useRef<HTMLInputElement>(null);
-  const sourceFiles = fileList.filter((file) => file.kind === "source");
   const responseFiles = fileList.filter((file) => file.kind === "response");
   const hasResponseDraft = Boolean(rfp.response_draft_content?.trim());
   const workspaceDocuments = useMemo(
@@ -554,11 +553,6 @@ export function RFPWorkspace({
             {converterPanel}
           </section>
 
-          <aside aria-label="Bid context" className="bid-context">
-            <div className="context-card"><span className="drop-kicker">Bid at a glance</span><h2>{rfp.tender_code || "RFP details"}</h2><dl><div><dt>Status</dt><dd>{rfp.status}</dd></div><div><dt>Stage</dt><dd>{rfp.pipeline_stage}</dd></div><div><dt>Deadline</dt><dd>{rfp.closing_date || "Not set"}</dd></div><div><dt>Sources</dt><dd>{rfp.document_links.length + sourceFiles.length}</dd></div></dl></div>
-            <div className="context-card"><h3>Quick access</h3><button className="context-link" onClick={() => setActiveTab("summary")} type="button"><span>Summary</span><span>{summary ? "Ready" : "Not generated"}</span></button><button className="context-link" onClick={() => setActiveTab("response")} type="button"><span>Drafts</span><span>{hasResponseDraft || responseFiles.length ? "In progress" : "Empty"}</span></button><button className="context-link" onClick={() => setActiveTab("team")} type="button"><span>Activity</span><span>{commentList.length}</span></button></div>
-            <div className="context-card"><h3>Actions</h3><button className="context-link" onClick={() => setShowConverter(true)} type="button"><span>Add converted document</span><span>＋</span></button>{rfp.gdrive_link ? <a className="context-link" href={rfp.gdrive_link} rel="noreferrer" target="_blank"><span>Open Google Drive</span><span>↗</span></a> : null}</div>
-          </aside>
         </div>
       ) : null}
 

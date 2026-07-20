@@ -9,6 +9,7 @@
 
 table {
   width: 100%;
+  min-width: 1180px;
   border-collapse: separate;
   border-spacing: 0;
   font-size: 13px;
@@ -40,7 +41,7 @@ table {
 }
 
 .count-column {
-  width: 76px;
+  width: 132px;
 }
 
 .comments-column {
