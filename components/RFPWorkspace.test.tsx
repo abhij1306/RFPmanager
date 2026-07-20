@@ -43,15 +43,18 @@ describe("RFPWorkspace", () => {
       new Response(JSON.stringify({ document: { id: "doc-1", markdown: "# Loaded specification" } }), { status: 200 }),
     );
 
-    render(<RFPWorkspace comments={[]} documents={[sourceDocument]} files={[]} rfp={rfp} />);
+    try {
+      render(<RFPWorkspace comments={[]} documentTotalCount={1} documents={[sourceDocument]} files={[]} rfp={rfp} />);
 
-    expect(await screen.findByText("# Loaded specification")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith("/api/rfp/rfp-1/documents/doc-1");
-    fetchMock.mockRestore();
+      expect(await screen.findByText("# Loaded specification")).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledWith("/api/rfp/rfp-1/documents/doc-1");
+    } finally {
+      fetchMock.mockRestore();
+    }
   });
 
   it("shows a ChatGPT-saved response draft in the response tab", () => {
-    render(<RFPWorkspace comments={[]} documents={[]} files={[]} rfp={rfp} />);
+    render(<RFPWorkspace comments={[]} documentTotalCount={0} documents={[]} files={[]} rfp={rfp} />);
 
     fireEvent.click(screen.getByRole("button", { name: /response/i }));
 
@@ -65,7 +68,7 @@ describe("RFPWorkspace", () => {
       configurable: true,
       value: { writeText },
     });
-    render(<RFPWorkspace comments={[]} documents={[]} files={[]} rfp={rfp} />);
+    render(<RFPWorkspace comments={[]} documentTotalCount={0} documents={[]} files={[]} rfp={rfp} />);
 
     fireEvent.click(screen.getByRole("button", { name: /response/i }));
     fireEvent.click(screen.getByRole("button", { name: /copy draft/i }));

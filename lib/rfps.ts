@@ -162,11 +162,26 @@ export async function listRfps(): Promise<Rfp[]> {
 /** Load only the fields needed by the tracker table. */
 export async function listTrackerRfps(): Promise<Rfp[]> {
   const supabase = getSupabase();
-  const { data, error } = await supabase
+  let data: Partial<Rfp>[] | null = null;
+  let error = null;
+
+  const primary = await supabase
     .from("rfps")
     .select(trackerSelectFields)
     .order("closing_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
+  data = primary.data;
+  error = primary.error;
+
+  if (error) {
+    const fallback = await supabase
+      .from("rfps")
+      .select(legacySelectFields)
+      .order("closing_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: false });
+    data = fallback.data;
+    error = fallback.error;
+  }
 
   if (error) throw error;
   return (data ?? []).map(withRfpDefaults);

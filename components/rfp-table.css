@@ -137,7 +137,7 @@ tbody tr:hover {
 }
 
 .status-tbd {
-  color: var(--warning);
+  color: #92400e;
   background: #fffbeb;
   border-color: #fef08a;
 }
@@ -148,7 +148,7 @@ tbody tr:hover {
 }
 
 .date-soon {
-  color: var(--warning);
+  color: #92400e;
   font-weight: 600;
 }
 

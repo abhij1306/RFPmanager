@@ -782,7 +782,7 @@ main {
   text-transform: uppercase;
 }
 
-.summary-item.status-tbd { background: #fffbeb; color: #d97706; border-color: #fef08a; }
+.summary-item.status-tbd { background: #fffbeb; color: #92400e; border-color: #fef08a; }
 .summary-item.status-yes { background: #f0fdf4; color: #16a34a; border-color: #bbf7d0; }
 .summary-item.status-no  { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
 
