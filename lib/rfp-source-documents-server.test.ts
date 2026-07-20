@@ -72,7 +72,10 @@ describe("remote RFP source documents", () => {
       rfpId: "rfp-1",
     });
 
-    expect(fetch).toHaveBeenCalledWith("https://files.example.test/tender.pdf");
+    expect(fetch).toHaveBeenCalledWith(
+      "https://files.example.test/tender.pdf",
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
     expect(convertBufferToMarkdownMock).toHaveBeenCalledWith({
       buffer: expect.any(ArrayBuffer),
       filename: "Tender Document.pdf",

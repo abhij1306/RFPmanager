@@ -12,6 +12,7 @@ A small team tool for managing RFP opportunities and converting RFP documents in
 - Browser bookmarklet for importing tender details and document links from tender pages.
 - Groq-powered summary generation from saved Markdown.
 - ChatGPT Actions endpoints for saving summaries, response drafts, documents, and response files.
+- Claude web/Cowork MCP connector for searching, reading, and updating shared RFP records.
 - Vercel-ready Next.js App Router project.
 
 ## Local Setup
@@ -208,7 +209,16 @@ If you later need per-user access, audit trails, or stronger isolation, replace 
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `GROQ_API_KEY`
    - `CHATGPT_ACTIONS_API_KEY`
+   - `RFPMANAGER_API_BASE_URL` (the deployed app origin, for example `https://rfpmanager.vercel.app`)
 4. Deploy.
+
+## Claude Web/Cowork MCP Connector
+
+The app exposes a stateless Streamable HTTP MCP endpoint at `/api/mcp`. It provides Claude with tools to list and find RFPs, read saved Markdown documents, inspect saved files, create or update RFP records, save summaries, and save editable response drafts. It does not upload files from Claude conversations; upload and convert tender files in RFPmanager first.
+
+Set `RFPMANAGER_API_BASE_URL` to the deployed app origin and keep `CHATGPT_ACTIONS_API_KEY` configured. The MCP endpoint uses the latter only for server-to-server calls to the existing ChatGPT API routes; it is never returned to Claude.
+
+In Claude, Cowork, or Claude Desktop, open Customize → Connectors → Add custom connector, enter `https://YOUR-VERCEL-DOMAIN/api/mcp`, and add it. The v1 endpoint intentionally has no login or per-user credential: anyone who knows the connector URL can read and modify the shared workspace, so share the URL only with approved users.
 
 ## Tender Import
 
