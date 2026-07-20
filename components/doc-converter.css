@@ -76,6 +76,23 @@
   box-shadow: var(--shadow-xs);
 }
 
+.library-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.library-pager .pager-disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.pager-status {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 @media (max-width: 980px) {
   .converter-workspace {
     grid-template-columns: 1fr;

@@ -45,7 +45,7 @@ export default async function ConvertPage({ searchParams }: { searchParams: Prom
       </section>
       {error ? <div className="notice error">{error}</div> : null}
       {libraryError ? <div className="notice error">{libraryError}</div> : null}
-      <DocConverter documentTotalCount={documentTotalCount} documents={documents} page={page} pageSize={PAGE_SIZE} rfps={rfps} />
+      <DocConverter documentTotalCount={documentTotalCount} documents={documents} key={page} page={page} pageSize={PAGE_SIZE} rfps={rfps} />
     </div>
   );
 }
