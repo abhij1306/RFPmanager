@@ -3,7 +3,7 @@ import { RFPForm } from "@/components/RFPForm";
 import { RFPHeaderActions } from "@/components/RFPHeaderActions";
 import { RFPWorkspace } from "@/components/RFPWorkspace";
 import { listCommentsByRfp } from "@/lib/comments";
-import { listDocumentsByRfp } from "@/lib/documents";
+import { listDocumentMetadataByRfp } from "@/lib/documents";
 import { listFilesByRfp } from "@/lib/rfp-files";
 import { getRfp } from "@/lib/rfps";
 import type { RfpComment, RfpDocument, RfpFile } from "@/lib/types";
@@ -24,7 +24,7 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
   let workspaceError: string | null = null;
 
   try {
-    [documents, files, comments] = await Promise.all([listDocumentsByRfp(id), listFilesByRfp(id), listCommentsByRfp(id)]);
+    [documents, files, comments] = await Promise.all([listDocumentMetadataByRfp(id), listFilesByRfp(id), listCommentsByRfp(id)]);
   } catch (loadError) {
     workspaceError = loadError instanceof Error ? loadError.message : "Could not load RFP workspace.";
   }

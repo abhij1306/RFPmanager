@@ -3,8 +3,12 @@
 }
 
 .table-wrap {
-  max-height: calc(100svh - 190px);
+  max-height: calc(100svh - 180px);
   overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
 }
 
 table {
@@ -41,7 +45,7 @@ table {
 }
 
 .count-column {
-  width: 132px;
+  width: 172px; /* Slightly wider for flat document count badges */
 }
 
 .comments-column {
@@ -54,8 +58,8 @@ table {
 
 th,
 td {
-  height: 42px;
-  padding: 0 10px;
+  height: 40px;
+  padding: 0 12px;
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   text-align: left;
@@ -74,24 +78,26 @@ th {
   position: sticky;
   top: 0;
   z-index: 1;
-  color: #3f4750;
-  background: #eceee8;
+  color: var(--muted);
+  background: var(--bg);
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--line-strong);
 }
 
 tbody tr {
-  background: var(--panel);
+  background: var(--surface);
 }
 
 tbody tr:hover {
-  background: #eef4ff;
+  background: var(--bg);
 }
 
 .row-link {
   color: var(--text);
-  font-weight: 400;
+  font-weight: 500;
 }
 
 .truncate-link {
@@ -108,41 +114,42 @@ tbody tr:hover {
 
 .status {
   display: inline-flex;
-  min-width: 48px;
+  min-width: 44px;
   justify-content: center;
-  padding: 3px 7px;
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 750;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: var(--r-xs);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .status-yes {
   color: var(--ok);
-  background: #e6f4ea;
-  border-color: #b7dfc1;
+  background: #f0fdf4;
+  border-color: #bbf7d0;
 }
 
 .status-no {
   color: var(--danger);
-  background: #fce8e6;
-  border-color: #f4c7c3;
+  background: #fef2f2;
+  border-color: #fecaca;
 }
 
 .status-tbd {
   color: var(--warning);
-  background: #fef7e0;
-  border-color: #fdd663;
+  background: #fffbeb;
+  border-color: #fef08a;
 }
 
 .date-overdue {
   color: var(--danger);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .date-soon {
   color: var(--warning);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .link-list {
@@ -152,38 +159,49 @@ tbody tr:hover {
 
 .link-list a {
   color: var(--accent);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .count-link {
   display: inline-flex;
-  min-width: 28px;
-  min-height: 24px;
+  min-width: 24px;
+  min-height: 20px;
   align-items: center;
   justify-content: center;
-  color: #174ea6;
-  background: var(--accent-soft);
-  border: 1px solid #d2e3fc;
-  border-radius: 999px;
-  font-weight: 800;
+  padding: 0 6px;
+  color: var(--muted);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  font-size: 11px;
+  font-weight: 500;
+  transition: var(--t-interactive);
+}
+
+.count-link:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+  color: var(--text);
 }
 
 .icon-danger-button {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   align-items: center;
   justify-content: center;
-  color: var(--danger);
+  color: var(--muted);
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--r-xs);
   cursor: pointer;
+  transition: var(--t-interactive);
 }
 
 .icon-danger-button:hover:not(:disabled) {
-  background: #fce8e6;
-  border-color: #f4c7c3;
+  color: var(--danger);
+  background: #fef2f2;
+  border-color: #fecaca;
 }
 
 .icon-danger-button:disabled {
@@ -194,28 +212,30 @@ tbody tr:hover {
 .action-cell {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 0 8px;
+  gap: 6px;
+  padding: 0 10px;
   overflow: visible;
-  text-overflow: clip;
 }
 
 .table-upload-button {
   display: inline-flex;
-  min-width: 58px;
-  height: 30px;
+  min-width: 52px;
+  height: 28px;
   align-items: center;
   justify-content: center;
-  color: #174ea6;
-  background: var(--accent-soft);
-  border: 1px solid #d2e3fc;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 800;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-xs);
+  font-size: 11px;
+  font-weight: 600;
+  transition: var(--t-interactive);
 }
 
 .table-upload-button:hover:not(:disabled) {
-  background: #d2e3fc;
+  background: var(--bg);
+  border-color: var(--line-strong);
+  color: var(--text);
 }
 
 .empty {

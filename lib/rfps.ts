@@ -3,6 +3,7 @@ import type { Rfp, RfpCreateInput, RfpImportInput, RfpInput, RfpUpdateInput, Ten
 
 const selectFields =
   "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, contact_person, contact_phone, contact_email, document_links, summary, summary_generated_at, response_draft_title, response_draft_content, response_draft_saved_at, notes, pipeline_stage, created_at";
+const trackerSelectFields = "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, document_links, pipeline_stage, created_at";
 const legacySelectFields = "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, notes, pipeline_stage, created_at";
 
 function withRfpDefaults(rfp: Partial<Rfp>): Rfp {
@@ -155,6 +156,19 @@ export async function listRfps(): Promise<Rfp[]> {
     throw error;
   }
 
+  return (data ?? []).map(withRfpDefaults);
+}
+
+/** Load only the fields needed by the tracker table. */
+export async function listTrackerRfps(): Promise<Rfp[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("rfps")
+    .select(trackerSelectFields)
+    .order("closing_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
   return (data ?? []).map(withRfpDefaults);
 }
 

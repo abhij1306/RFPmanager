@@ -3,7 +3,7 @@ import { RFPTable } from "@/components/RFPTable";
 import { listCommentCountsByRfp } from "@/lib/comments";
 import { listDocumentCountsByRfp } from "@/lib/documents";
 import { listSourceFileCountsByRfp } from "@/lib/rfp-files";
-import { listRfps } from "@/lib/rfps";
+import { listTrackerRfps } from "@/lib/rfps";
 import type { Rfp } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ export default async function DashboardPage() {
   let workspaceError: string | null = null;
 
   try {
-    rfps = await listRfps();
+    rfps = await listTrackerRfps();
   } catch (loadError) {
     error = loadError instanceof Error ? loadError.message : "Could not load RFPs.";
   }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createComment, deleteComment } from "@/lib/comments";
 import { convertFile } from "@/lib/document-conversion";
 import { createDocument, deleteDocument } from "@/lib/documents";
@@ -62,7 +62,7 @@ function deriveWorkspaceDocuments(rfp: Rfp, documentList: RfpDocument[], fileLis
       status: file ? "Converted" : "Saved markdown",
       file,
       document,
-      preview: document.markdown,
+      preview: document.markdown || undefined,
     };
   });
   const unconverted = fileList
@@ -135,6 +135,9 @@ export function RFPWorkspace({
   const [documentQuery, setDocumentQuery] = useState("");
   const [documentFilter, setDocumentFilter] = useState<"all" | "source" | "link" | "response" | "converted" | "needs-conversion">("all");
   const [showConverter, setShowConverter] = useState(false);
+  const [documentMarkdown, setDocumentMarkdown] = useState<Record<string, string>>({});
+  const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null);
+  const loadingDocumentIdsRef = useRef(new Set<string>());
   const urlReadyRef = useRef(false);
 
   const sourceInputRef = useRef<HTMLInputElement>(null);
@@ -160,6 +163,10 @@ export function RFPWorkspace({
   }, [documentFilter, documentQuery, workspaceDocuments]);
   const resolvedSelectedDocumentId = selectedDocumentId ?? workspaceDocuments[0]?.id ?? null;
   const selectedDocument = workspaceDocuments.find((item) => item.id === resolvedSelectedDocumentId) ?? null;
+  const selectedSourceDocument = selectedDocument?.document;
+  const selectedPreview = selectedDocument?.document
+    ? documentMarkdown[selectedDocument.document.id] ?? selectedDocument.preview
+    : selectedDocument?.preview;
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -180,6 +187,50 @@ export function RFPWorkspace({
     const query = params.toString();
     window.history.replaceState({}, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
   }, [activeTab, resolvedSelectedDocumentId]);
+
+  const requestDocumentMarkdown = useCallback(async (documentId: string): Promise<string> => {
+    const response = await fetch(`/api/rfp/${rfp.id}/documents/${documentId}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error ?? "Could not load document content.");
+    return data.document?.markdown ?? "";
+  }, [rfp.id]);
+
+  const loadDocumentMarkdown = useCallback(async (document: RfpDocument): Promise<string> => {
+    if (document.markdown) return document.markdown;
+    const cached = documentMarkdown[document.id];
+    if (cached !== undefined) return cached;
+    if (loadingDocumentIdsRef.current.has(document.id)) return "";
+
+    loadingDocumentIdsRef.current.add(document.id);
+    setLoadingDocumentId(document.id);
+    try {
+      const markdown = await requestDocumentMarkdown(document.id);
+      setDocumentMarkdown((current) => ({ ...current, [document.id]: markdown }));
+      return markdown;
+    } finally {
+      loadingDocumentIdsRef.current.delete(document.id);
+      setLoadingDocumentId((current) => (current === document.id ? null : current));
+    }
+  }, [documentMarkdown, requestDocumentMarkdown]);
+
+  function selectDocument(id: string) {
+    setSelectedDocumentId(id);
+    const item = workspaceDocuments.find((candidate) => candidate.id === id);
+    if (item?.document && !item.document.markdown && documentMarkdown[item.document.id] === undefined) {
+      void loadDocumentMarkdown(item.document).catch((error) => {
+        setMessageType("error");
+        setMessage(error instanceof Error ? error.message : "Could not load document content.");
+      });
+    }
+  }
+
+  useEffect(() => {
+    if (!selectedSourceDocument || selectedPreview) return;
+    void loadDocumentMarkdown(selectedSourceDocument).catch((error) => {
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not load document content.");
+    });
+  }, [loadDocumentMarkdown, selectedPreview, selectedSourceDocument]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   async function handleFiles(files: FileList | null) {
@@ -365,15 +416,35 @@ export function RFPWorkspace({
   }
 
   async function generateSummary(documentsToSummarize = documentList) {
-    const markdown = combineDocumentMarkdown(documentsToSummarize);
-    if (!markdown.trim()) {
-      setMessageType("error");
-      setMessage("Save converted markdown before generating a summary.");
-      return;
-    }
     setIsSummarizing(true);
     setMessage(null);
     setMessageType("info");
+    let documentsWithMarkdown: RfpDocument[];
+    try {
+      documentsWithMarkdown = await Promise.all(
+        documentsToSummarize.map(async (document) => ({
+          ...document,
+          markdown: document.markdown || documentMarkdown[document.id] || (await requestDocumentMarkdown(document.id)),
+        })),
+      );
+      setDocumentMarkdown((current) => ({
+        ...current,
+        ...Object.fromEntries(documentsWithMarkdown.map((document) => [document.id, document.markdown])),
+      }));
+    } catch (error) {
+      setIsSummarizing(false);
+      setMessageType("error");
+      setMessage(error instanceof Error ? error.message : "Could not load document content.");
+      return;
+    }
+
+    const markdown = combineDocumentMarkdown(documentsWithMarkdown);
+    if (!markdown.trim()) {
+      setMessageType("error");
+      setMessage("Save converted markdown before generating a summary.");
+      setIsSummarizing(false);
+      return;
+    }
     try {
       const response = await fetch("/api/summarize", {
         method: "POST",
@@ -528,7 +599,7 @@ export function RFPWorkspace({
                 <div className="navigator-group" key={group.label}>
                   <div className="navigator-group-label">{group.label}<span>{group.items.length}</span></div>
                   {group.items.map((item) => (
-                    <button aria-current={resolvedSelectedDocumentId === item.id ? "true" : undefined} className={`navigator-item ${resolvedSelectedDocumentId === item.id ? "active" : ""}`} key={item.id} onClick={() => setSelectedDocumentId(item.id)} type="button">
+                    <button aria-current={resolvedSelectedDocumentId === item.id ? "true" : undefined} className={`navigator-item ${resolvedSelectedDocumentId === item.id ? "active" : ""}`} key={item.id} onClick={() => selectDocument(item.id)} type="button">
                       <span className="file-icon">{item.category === "link" ? "URL" : item.category === "response" ? "RSP" : item.document ? "MD" : "SRC"}</span>
                       <span className="document-main"><span className="document-title">{item.title}</span><span className="document-meta">{item.status} · {item.meta}</span></span>
                     </button>
@@ -549,7 +620,7 @@ export function RFPWorkspace({
                 {selectedDocument?.file ? <button className="text-danger" onClick={() => void removeFile(selectedDocument.file!)} type="button">Delete file</button> : null}
               </div>
             </div>
-            {selectedDocument?.preview ? <pre className="markdown-preview reader-preview">{selectedDocument.preview}</pre> : selectedDocument ? <div className="reader-empty"><strong>Preview unavailable</strong><p>This item has no converted text. Use Download or Open link to view the original.</p>{selectedDocument.file ? <button className="button compact-button" onClick={() => void downloadFile(selectedDocument.file!)} type="button">Download original</button> : null}</div> : <div className="reader-empty"><strong>Your reading pane is ready</strong><p>Select a document from the library. The list and this pane scroll independently.</p></div>}
+            {selectedDocument?.document && loadingDocumentId === selectedDocument.document.id ? <div className="reader-empty"><strong>Loading document…</strong><p>Fetching the selected document content.</p></div> : selectedPreview ? <pre className="markdown-preview reader-preview">{selectedPreview}</pre> : selectedDocument ? <div className="reader-empty"><strong>Preview unavailable</strong><p>This item has no converted text. Use Download or Open link to view the original.</p>{selectedDocument.file ? <button className="button compact-button" onClick={() => void downloadFile(selectedDocument.file!)} type="button">Download original</button> : null}</div> : <div className="reader-empty"><strong>Your reading pane is ready</strong><p>Select a document from the library. The list and this pane scroll independently.</p></div>}
             {converterPanel}
           </section>
 

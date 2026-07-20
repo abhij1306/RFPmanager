@@ -3,11 +3,19 @@ import { getSupabase } from "@/lib/supabase";
 import type { RfpDocument, RfpDocumentInput } from "@/lib/types";
 
 const selectFields = "id, rfp_id, source_file_id, title, source_filename, source_type, markdown, created_at";
+const metadataSelectFields = "id, rfp_id, source_file_id, title, source_filename, source_type, created_at";
 const helpers = createTableHelpers<RfpDocument, RfpDocumentInput>("rfp_documents", selectFields);
+const metadataHelpers = createTableHelpers<RfpDocument, RfpDocumentInput>("rfp_documents", metadataSelectFields);
 
 export const listDocuments = helpers.list;
 
 export const listDocumentsByRfp = helpers.listByRfp;
+
+/** Load document rows without the potentially large Markdown body. */
+export async function listDocumentMetadataByRfp(rfpId: string): Promise<RfpDocument[]> {
+  const rows = await metadataHelpers.listByRfp(rfpId);
+  return rows.map((row) => ({ ...row, markdown: "" }));
+}
 
 export const createDocument = helpers.create;
 

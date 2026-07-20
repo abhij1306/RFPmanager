@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { RFPWorkspace } from "@/components/RFPWorkspace";
-import type { Rfp } from "@/lib/types";
+import type { Rfp, RfpDocument } from "@/lib/types";
 
 const rfp: Rfp = {
   id: "rfp-1",
@@ -28,6 +28,28 @@ const rfp: Rfp = {
 };
 
 describe("RFPWorkspace", () => {
+  it("loads document Markdown only after the document is selected", async () => {
+    const sourceDocument: RfpDocument = {
+      id: "doc-1",
+      rfp_id: "rfp-1",
+      source_file_id: null,
+      title: "Tender specification",
+      source_filename: "specification.pdf",
+      source_type: "pdf",
+      markdown: "",
+      created_at: "2026-06-01T00:00:00.000Z",
+    };
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ document: { id: "doc-1", markdown: "# Loaded specification" } }), { status: 200 }),
+    );
+
+    render(<RFPWorkspace comments={[]} documents={[sourceDocument]} files={[]} rfp={rfp} />);
+
+    expect(await screen.findByText("# Loaded specification")).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith("/api/rfp/rfp-1/documents/doc-1");
+    fetchMock.mockRestore();
+  });
+
   it("shows a ChatGPT-saved response draft in the response tab", () => {
     render(<RFPWorkspace comments={[]} documents={[]} files={[]} rfp={rfp} />);
 
