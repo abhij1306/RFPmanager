@@ -84,10 +84,12 @@ function RfpSourceUploadButton({ onUploaded, rfp }: { onUploaded: (count: number
 export function RFPTable({
   commentCounts,
   documentCounts,
+  fileCounts,
   rfps,
 }: {
   commentCounts: Record<string, number>;
   documentCounts: Record<string, number>;
+  fileCounts: Record<string, number>;
   rfps: Rfp[];
 }) {
   const router = useRouter();
@@ -209,9 +211,14 @@ export function RFPTable({
                     </Link>
                   </td>
                   <td>
-                    <Link className="count-link" href={`/rfp/${rfp.id}`}>
-                      {(documentCounts[rfp.id] ?? 0) + (uploadedDocumentCounts[rfp.id] ?? 0)}
-                    </Link>
+                    <div className="document-counts">
+                      <Link className="count-link" href={`/rfp/${rfp.id}`} title="Source files and tender links">
+                        {rfp.document_links.length + (fileCounts[rfp.id] ?? 0) + (uploadedDocumentCounts[rfp.id] ?? 0)} sources
+                      </Link>
+                      <Link className="count-link" href={`/rfp/${rfp.id}`} title="Converted Markdown documents">
+                        {documentCounts[rfp.id] ?? 0} converted
+                      </Link>
+                    </div>
                   </td>
                   <td className="action-cell">
                     <RfpSourceUploadButton

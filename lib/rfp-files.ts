@@ -112,3 +112,15 @@ export async function createRfpFileDownloadUrl(file: RfpFile): Promise<string> {
 export function listFileCountsByRfp(): Promise<RfpCount[]> {
   return listCountsByRfp("list_file_counts_by_rfp");
 }
+
+export async function listSourceFileCountsByRfp(): Promise<RfpCount[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from("rfp_files").select("rfp_id").eq("kind", "source");
+  if (error) throw error;
+
+  const counts = new Map<string, number>();
+  for (const row of data ?? []) {
+    counts.set(row.rfp_id, (counts.get(row.rfp_id) ?? 0) + 1);
+  }
+  return Array.from(counts, ([rfp_id, count]) => ({ rfp_id, count }));
+}

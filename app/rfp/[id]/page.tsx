@@ -46,13 +46,20 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
   return (
     <div className="shell">
       <section className="project-hero">
-        {rfp.tender_link ? (
-          <a className="project-title-link" href={rfp.tender_link} rel="noreferrer" target="_blank">
-            {titleContent}
-          </a>
-        ) : (
-          <div>{titleContent}</div>
-        )}
+        <div className="project-identity">
+          {rfp.tender_link ? (
+            <a className="project-title-link" href={rfp.tender_link} rel="noreferrer" target="_blank">
+              {titleContent}
+            </a>
+          ) : (
+            <div>{titleContent}</div>
+          )}
+          <div aria-label="RFP status" className="project-status-row">
+            <span className={`status status-${rfp.status.toLowerCase()}`}>{rfp.status}</span>
+            <span className="project-stage">{rfp.pipeline_stage}</span>
+            {rfp.closing_date ? <span className="project-deadline">Due {rfp.closing_date}</span> : null}
+          </div>
+        </div>
         <RFPHeaderActions formId={formId} gdriveLink={rfp.gdrive_link} rfpId={rfp.id} sourceInputId={sourceInputId} />
       </section>
       {workspaceError ? <div className="notice error">{workspaceError}</div> : null}

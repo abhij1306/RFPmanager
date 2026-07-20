@@ -51,9 +51,14 @@ export function RFPHeaderActions({
           Open Google Drive
         </a>
       ) : null}
-      <button className="danger-button" disabled={isDeleting} onClick={() => void onDelete()} type="button">
-        {isDeleting ? "Deleting..." : "Delete"}
-      </button>
+      <details className="header-more">
+        <summary aria-label="More RFP actions">More</summary>
+        <div className="header-more-menu">
+          <button className="danger-button" disabled={isDeleting} onClick={() => void onDelete()} type="button">
+            {isDeleting ? "Deleting..." : "Delete RFP"}
+          </button>
+        </div>
+      </details>
     </div>
   );
 }
