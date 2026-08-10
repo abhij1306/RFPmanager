@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
+import { getErrorMessage } from "@/lib/errors";
 import { uploadSourceDocuments } from "@/lib/rfp-source-documents";
 import { createRfp, updateRfp } from "@/lib/rfps";
 import type { Rfp, RfpInput } from "@/lib/types";
@@ -643,15 +644,16 @@ export function RFPForm({
       return;
     }
 
+    let saved: Rfp | null = null;
+
     try {
-      const saved = await saveRfp({ editableInput, form, isEditing, rfp });
+      saved = await saveRfp({ editableInput, form, isEditing, rfp });
       const uploadedSourceCount = await uploadSelectedSources(saved.id);
 
       setForm(inputFromRfp(saved));
 
       if (isEditing) {
         setNotice(savedNotice(uploadedSourceCount));
-        setIsSaving(false);
         router.refresh();
         return;
       }
@@ -659,7 +661,23 @@ export function RFPForm({
       router.push(`/rfp/${saved.id}`);
       router.refresh();
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "Could not save this RFP.");
+      const message = getErrorMessage(saveError, saved ? "Could not upload the selected source documents." : "Could not save this RFP.");
+
+      if (saved) {
+        setForm(inputFromRfp(saved));
+        router.refresh();
+
+        if (!isEditing) {
+          window.alert(`The RFP was created, but its source upload was incomplete. ${message}`);
+          router.push(`/rfp/${saved.id}`);
+          return;
+        }
+
+        setError(`The RFP was saved, but its source upload was incomplete. ${message}`);
+      } else {
+        setError(message);
+      }
+    } finally {
       setSourceUploadProgress("");
       setIsSaving(false);
     }

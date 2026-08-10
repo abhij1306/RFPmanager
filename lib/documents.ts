@@ -1,4 +1,5 @@
 import { createTableHelpers, listCountsByRfp, type RfpCount } from "@/lib/table-helpers";
+import { toError } from "@/lib/errors";
 import { getSupabase } from "@/lib/supabase";
 import type { RfpDocument, RfpDocumentInput } from "@/lib/types";
 
@@ -41,7 +42,7 @@ export async function listDocumentMetadataPage({
   if (rfpId) query = query.eq("rfp_id", rfpId);
 
   const { count, data, error } = await query;
-  if (error) throw error;
+  if (error) throw toError(error, "Could not load document metadata.");
 
   return {
     documents: ((data ?? []) as RfpDocument[]).map((row) => ({ ...row, markdown: "" })),
@@ -63,7 +64,7 @@ export async function getDocumentByRfp(rfpId: string, documentId: string): Promi
     .maybeSingle();
 
   if (error) {
-    throw error;
+    throw toError(error, "Could not load document content.");
   }
 
   return data as RfpDocument | null;

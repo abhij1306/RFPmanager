@@ -1,4 +1,5 @@
 import { getSupabase } from "@/lib/supabase";
+import { toError } from "@/lib/errors";
 
 export type RfpCount = {
   rfp_id: string;
@@ -19,7 +20,7 @@ export function createTableHelpers<Row, Input>(tableName: string, selectFields: 
       const { data, error } = await supabase.from(tableName).select(selectFields).order("created_at", { ascending: false });
 
       if (error) {
-        throw error;
+        throw toError(error, `Could not list ${tableName}.`);
       }
 
       return (data ?? []) as Row[];
@@ -34,7 +35,7 @@ export function createTableHelpers<Row, Input>(tableName: string, selectFields: 
         .order("created_at", { ascending: false });
 
       if (error) {
-        throw error;
+        throw toError(error, `Could not list ${tableName} for this RFP.`);
       }
 
       return (data ?? []) as Row[];
@@ -45,7 +46,7 @@ export function createTableHelpers<Row, Input>(tableName: string, selectFields: 
       const { data, error } = await supabase.from(tableName).insert(input as never).select(selectFields).single();
 
       if (error) {
-        throw error;
+        throw toError(error, `Could not create a ${tableName} record.`);
       }
 
       return data as Row;
@@ -56,7 +57,7 @@ export function createTableHelpers<Row, Input>(tableName: string, selectFields: 
       const { error } = await supabase.from(tableName).delete().eq("id", id);
 
       if (error) {
-        throw error;
+        throw toError(error, `Could not delete the ${tableName} record.`);
       }
     },
   };
@@ -67,7 +68,7 @@ export async function listCountsByRfp(functionName: string): Promise<RfpCount[]>
   const { data, error } = await supabase.rpc(functionName);
 
   if (error) {
-    throw error;
+    throw toError(error, `Could not load counts from ${functionName}.`);
   }
 
   return ((data ?? []) as Array<{ rfp_id: string; count: number | string }>).map((item) => ({

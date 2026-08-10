@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { RFPWorkspace } from "@/components/RFPWorkspace";
-import type { Rfp, RfpDocument } from "@/lib/types";
+import type { Rfp, RfpComment, RfpDocument } from "@/lib/types";
 
 const rfp: Rfp = {
   id: "rfp-1",
@@ -75,5 +75,20 @@ describe("RFPWorkspace", () => {
 
     expect(writeText).toHaveBeenCalledWith("We propose a managed content platform implementation.");
     expect(await screen.findByText("Response draft copied to clipboard.")).toBeInTheDocument();
+  });
+
+  it("reconciles refreshed server data with local workspace state", async () => {
+    const comment: RfpComment = {
+      id: "comment-1",
+      rfp_id: "rfp-1",
+      author_name: "Team",
+      body: "Added after a server refresh",
+      created_at: "2026-08-10T00:00:00.000Z",
+    };
+    const view = render(<RFPWorkspace comments={[]} documentTotalCount={0} documents={[]} files={[]} rfp={rfp} />);
+
+    view.rerender(<RFPWorkspace comments={[comment]} documentTotalCount={0} documents={[]} files={[]} rfp={rfp} />);
+
+    expect(screen.getByRole("button", { name: /activity/i })).toHaveTextContent("1");
   });
 });

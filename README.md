@@ -20,7 +20,7 @@ A small team tool for managing RFP opportunities and converting RFP documents in
 1. Install dependencies:
 
 ```bash
-npm install
+pnpm install
 ```
 
 2. Copy environment variables:
@@ -38,12 +38,12 @@ cp .env.example .env.local
 6. Run the app:
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 ## Runtime Dependencies
 
-The current document converter runs in the browser. Team members do not need to install LibreOffice, Python, Pandoc, MarkItDown, Docling, or any other external conversion tool for the existing DOCX, PDF, XLSX, and CSV conversion flow. Running `npm install` is enough for the app dependencies.
+The current document converter runs in the browser. Team members do not need to install LibreOffice, Python, Pandoc, MarkItDown, Docling, or any other external conversion tool for the existing DOCX, PDF, XLSX, and CSV conversion flow. Running `pnpm install` is enough for the app dependencies.
 
 The app still needs:
 
@@ -231,8 +231,8 @@ Good first debug targets are VendorPanel, Australian Tenders, TenderLink, SA Ten
 ## Scripts
 
 ```bash
-npm run dev
-npm run build
-npm run test
+pnpm dev
+pnpm build
+pnpm test
 ```
 https://chatgpt.com/g/g-6a204eb74ff0819197b925c02a12e970-rfpmanager

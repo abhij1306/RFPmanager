@@ -1,10 +1,18 @@
 import { getSupabase } from "@/lib/supabase";
+import { toError } from "@/lib/errors";
 import type { Rfp, RfpCreateInput, RfpImportInput, RfpInput, RfpUpdateInput, TenderDocumentLink } from "@/lib/types";
 
 const selectFields =
   "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, description, contact_person, contact_phone, contact_email, document_links, summary, summary_generated_at, response_draft_title, response_draft_content, response_draft_saved_at, notes, pipeline_stage, created_at";
 const trackerSelectFields = "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, document_links, pipeline_stage, created_at";
 const legacySelectFields = "id, client_name, status, closing_date, tender_code, tender_link, gdrive_link, notes, pipeline_stage, created_at";
+
+function isMissingColumnError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const { code } = error as { code?: unknown };
+  return code === "42703" || code === "PGRST204";
+}
 
 function withRfpDefaults(rfp: Partial<Rfp>): Rfp {
   return {
@@ -142,7 +150,7 @@ export async function listRfps(): Promise<Rfp[]> {
   data = primary.data;
   error = primary.error;
 
-  if (error) {
+  if (isMissingColumnError(error)) {
     const fallback = await supabase
       .from("rfps")
       .select(legacySelectFields)
@@ -153,7 +161,7 @@ export async function listRfps(): Promise<Rfp[]> {
   }
 
   if (error) {
-    throw error;
+    throw toError(error, "Could not list RFPs.");
   }
 
   return (data ?? []).map(withRfpDefaults);
@@ -173,7 +181,7 @@ export async function listTrackerRfps(): Promise<Rfp[]> {
   data = primary.data;
   error = primary.error;
 
-  if (error) {
+  if (isMissingColumnError(error)) {
     const fallback = await supabase
       .from("rfps")
       .select(legacySelectFields)
@@ -183,7 +191,7 @@ export async function listTrackerRfps(): Promise<Rfp[]> {
     error = fallback.error;
   }
 
-  if (error) throw error;
+  if (error) throw toError(error, "Could not list tracker RFPs.");
   return (data ?? []).map(withRfpDefaults);
 }
 
@@ -196,14 +204,14 @@ export async function getRfp(id: string): Promise<Rfp | null> {
   data = primary.data;
   error = primary.error;
 
-  if (error) {
+  if (isMissingColumnError(error)) {
     const fallback = await supabase.from("rfps").select(legacySelectFields).eq("id", id).maybeSingle();
     data = fallback.data;
     error = fallback.error;
   }
 
   if (error) {
-    throw error;
+    throw toError(error, "Could not load the RFP.");
   }
 
   return data ? withRfpDefaults(data) : null;
@@ -214,7 +222,7 @@ export async function createRfp(input: RfpCreateInput): Promise<Rfp> {
   const { data, error } = await supabase.from("rfps").insert(input).select(selectFields).single();
 
   if (error) {
-    throw error;
+    throw toError(error, "Could not create the RFP.");
   }
 
   return data;
@@ -225,7 +233,7 @@ export async function updateRfp(id: string, input: Partial<RfpInput>): Promise<R
   const { data, error } = await supabase.from("rfps").update(input).eq("id", id).select(selectFields).single();
 
   if (error) {
-    throw error;
+    throw toError(error, "Could not update the RFP.");
   }
 
   return data;
@@ -236,7 +244,7 @@ export async function deleteRfp(id: string): Promise<void> {
   const { error } = await supabase.from("rfps").delete().eq("id", id);
 
   if (error) {
-    throw error;
+    throw toError(error, "Could not delete the RFP.");
   }
 }
 
@@ -250,7 +258,7 @@ export async function updateRfpSummary(id: string, summary: string): Promise<Rfp
     .single();
 
   if (error) {
-    throw error;
+    throw toError(error, "Could not save the RFP summary.");
   }
 
   return data;
@@ -270,7 +278,7 @@ export async function updateRfpResponseDraft(id: string, title: string, content:
     .single();
 
   if (error) {
-    throw error;
+    throw toError(error, "Could not save the response draft.");
   }
 
   return data;

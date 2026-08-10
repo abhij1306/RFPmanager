@@ -1,4 +1,5 @@
 import { createTableHelpers, listCountsByRfp, type RfpCount } from "@/lib/table-helpers";
+import { toError } from "@/lib/errors";
 import { getSupabase } from "@/lib/supabase";
 import type { RfpFile, RfpFileInput, RfpFileKind } from "@/lib/types";
 
@@ -63,7 +64,7 @@ export async function uploadRfpFile({
   });
 
   if (uploadError) {
-    throw uploadError;
+    throw toError(uploadError, "Could not upload the file.");
   }
 
   try {
@@ -90,7 +91,7 @@ export async function deleteRfpFile(file: RfpFile): Promise<void> {
   const { error: storageError } = await supabase.storage.from(RFP_FILES_BUCKET).remove([file.storage_path]);
 
   if (storageError) {
-    throw storageError;
+    throw toError(storageError, "Could not delete the stored file.");
   }
 
   await helpers.remove(file.id);
@@ -103,7 +104,7 @@ export async function createRfpFileDownloadUrl(file: RfpFile): Promise<string> {
   });
 
   if (error) {
-    throw error;
+    throw toError(error, "Could not create a file download link.");
   }
 
   return data.signedUrl;
@@ -116,7 +117,7 @@ export function listFileCountsByRfp(): Promise<RfpCount[]> {
 export async function listSourceFileCountsByRfp(): Promise<RfpCount[]> {
   const supabase = getSupabase();
   const { data, error } = await supabase.from("rfp_files").select("rfp_id").eq("kind", "source");
-  if (error) throw error;
+  if (error) throw toError(error, "Could not count source files.");
 
   const counts = new Map<string, number>();
   for (const row of data ?? []) {

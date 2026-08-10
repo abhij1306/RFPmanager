@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { getErrorMessage } from "@/lib/errors";
 import { deleteRfp } from "@/lib/rfps";
 
 export function RFPHeaderActions({
@@ -31,7 +32,7 @@ export function RFPHeaderActions({
       router.refresh();
     } catch (error) {
       setIsDeleting(false);
-      window.alert(error instanceof Error ? error.message : "Could not delete this RFP.");
+      window.alert(getErrorMessage(error, "Could not delete this RFP."));
     }
   }
 

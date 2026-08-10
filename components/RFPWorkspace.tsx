@@ -4,8 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createComment, deleteComment } from "@/lib/comments";
 import { convertFile } from "@/lib/document-conversion";
 import { createDocument, deleteDocument } from "@/lib/documents";
+import { getErrorMessage, PartialUploadError } from "@/lib/errors";
 import { createRfpFileDownloadUrl, deleteRfpFile, uploadRfpFile } from "@/lib/rfp-files";
-import { uploadSourceDocuments } from "@/lib/rfp-source-documents";
+import { uploadSourceDocuments, type UploadedSourceDocument } from "@/lib/rfp-source-documents";
 import type { Rfp, RfpComment, RfpDocument, RfpDocumentSourceType, RfpFile, TenderDocumentLink } from "@/lib/types";
 
 type WorkspaceTab = "documents" | "summary" | "response" | "team";
@@ -21,6 +22,14 @@ export type WorkspaceDocument = {
   link?: TenderDocumentLink;
   preview?: string;
 };
+
+type RFPWorkspaceProps = Readonly<{
+  comments: RfpComment[];
+  documentTotalCount: number;
+  documents: RfpDocument[];
+  files: RfpFile[];
+  rfp: Rfp;
+}>;
 
 const FILE_ACCEPT =
   ".docx,.pdf,.xlsx,.csv,.md,.markdown,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,text/markdown,text/plain";
@@ -46,6 +55,25 @@ function formatFileMeta(file: RfpFile): string {
 function workspaceTabFromQuery(value: string | null): WorkspaceTab {
   if (value === "summary" || value === "response" || value === "team") return value;
   return "documents";
+}
+
+function prependUniqueById<Item extends { id: string }>(items: Item[], current: Item[]): Item[] {
+  const itemIds = new Set(items.map((item) => item.id));
+  return [...items, ...current.filter((item) => !itemIds.has(item.id))];
+}
+
+async function readJsonResponse<Result>(response: Response, fallback: string): Promise<Result> {
+  const data = (await response.json().catch(() => null)) as (Result & { error?: string }) | null;
+
+  if (!response.ok) {
+    throw new Error(data?.error ?? `${fallback} (${response.status})`);
+  }
+
+  if (!data) {
+    throw new Error(fallback);
+  }
+
+  return data;
 }
 
 function deriveWorkspaceDocuments(rfp: Rfp, documentList: RfpDocument[], fileList: RfpFile[]): WorkspaceDocument[] {
@@ -97,19 +125,29 @@ function deriveWorkspaceDocuments(rfp: Rfp, documentList: RfpDocument[], fileLis
   return [...links, ...converted, ...unconverted, ...responses];
 }
 
-export function RFPWorkspace({
+function workspaceStateKey({ comments, documentTotalCount, documents, files, rfp }: RFPWorkspaceProps): string {
+  return JSON.stringify({
+    commentIds: comments.map((comment) => comment.id),
+    documentIds: documents.map((document) => document.id),
+    documentLinks: rfp.document_links,
+    documentTotalCount,
+    fileIds: files.map((file) => file.id),
+    responseDraftSavedAt: rfp.response_draft_saved_at,
+    summaryGeneratedAt: rfp.summary_generated_at,
+  });
+}
+
+export function RFPWorkspace(props: RFPWorkspaceProps) {
+  return <RFPWorkspaceState key={workspaceStateKey(props)} {...props} />;
+}
+
+function RFPWorkspaceState({
   comments,
   documentTotalCount: initialDocumentTotalCount,
   documents,
   files,
   rfp,
-}: {
-  comments: RfpComment[];
-  documentTotalCount: number;
-  documents: RfpDocument[];
-  files: RfpFile[];
-  rfp: Rfp;
-}) {
+}: RFPWorkspaceProps) {
   // ── State ─────────────────────────────────────────────────────────────────
   const [commentList, setCommentList] = useState(comments);
   const [documentList, setDocumentList] = useState(documents);
@@ -194,16 +232,13 @@ export function RFPWorkspace({
 
   const requestDocumentMarkdown = useCallback(async (documentId: string): Promise<string> => {
     const response = await fetch(`/api/rfp/${rfp.id}/documents/${documentId}`);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error ?? "Could not load document content.");
+    const data = await readJsonResponse<{ document?: { markdown?: string } }>(response, "Could not load document content.");
     return data.document?.markdown ?? "";
   }, [rfp.id]);
 
   const requestDocumentPage = useCallback(async (offset: number): Promise<{ documents: RfpDocument[]; totalCount: number }> => {
     const response = await fetch(`/api/rfp/${rfp.id}/documents?offset=${offset}&limit=25`);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error ?? "Could not load more documents.");
-    return data;
+    return readJsonResponse(response, "Could not load more documents.");
   }, [rfp.id]);
 
   async function loadMoreDocuments() {
@@ -218,7 +253,7 @@ export function RFPWorkspace({
       setDocumentTotalCount(page.totalCount);
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not load more documents.");
+      setMessage(getErrorMessage(error, "Could not load more documents."));
     } finally {
       setIsLoadingMoreDocuments(false);
     }
@@ -248,7 +283,7 @@ export function RFPWorkspace({
     if (item?.document && !item.document.markdown && documentMarkdown[item.document.id] === undefined) {
       void loadDocumentMarkdown(item.document).catch((error) => {
         setMessageType("error");
-        setMessage(error instanceof Error ? error.message : "Could not load document content.");
+        setMessage(getErrorMessage(error, "Could not load document content."));
       });
     }
   }
@@ -257,7 +292,7 @@ export function RFPWorkspace({
     if (!selectedSourceDocument || selectedPreview) return;
     void loadDocumentMarkdown(selectedSourceDocument).catch((error) => {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not load document content.");
+      setMessage(getErrorMessage(error, "Could not load document content."));
     });
   }, [loadDocumentMarkdown, selectedPreview, selectedSourceDocument]);
 
@@ -282,7 +317,7 @@ export function RFPWorkspace({
       setMarkdownDraft("");
       setSourceFile(null);
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not convert this file.");
+      setMessage(getErrorMessage(error, "Could not convert this file."));
     } finally {
       setIsConverting(false);
     }
@@ -302,7 +337,7 @@ export function RFPWorkspace({
       setCommentBody("");
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not add comment.");
+      setMessage(getErrorMessage(error, "Could not add comment."));
     } finally {
       setIsPosting(false);
     }
@@ -316,7 +351,7 @@ export function RFPWorkspace({
       setCommentList((current) => current.filter((comment) => comment.id !== id));
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not delete comment.");
+      setMessage(getErrorMessage(error, "Could not delete comment."));
     }
   }
 
@@ -334,7 +369,7 @@ export function RFPWorkspace({
       }
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not delete saved markdown.");
+      setMessage(getErrorMessage(error, "Could not delete saved markdown."));
     }
   }
 
@@ -346,7 +381,7 @@ export function RFPWorkspace({
       window.open(url, "_blank", "noopener,noreferrer");
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not create a download link.");
+      setMessage(getErrorMessage(error, "Could not create a download link."));
     }
   }
 
@@ -360,7 +395,7 @@ export function RFPWorkspace({
       setMessage("File deleted.");
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not delete file.");
+      setMessage(getErrorMessage(error, "Could not delete file."));
     }
   }
 
@@ -389,7 +424,7 @@ export function RFPWorkspace({
       if (responseInputRef.current) responseInputRef.current.value = "";
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not save response file.");
+      setMessage(getErrorMessage(error, "Could not save response file."));
     } finally {
       setIsUploadingResponse(false);
     }
@@ -405,8 +440,17 @@ export function RFPWorkspace({
       setMessage("Response draft copied to clipboard.");
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not copy response draft.");
+      setMessage(getErrorMessage(error, "Could not copy response draft."));
     }
+  }
+
+  function addUploadedSources(saved: UploadedSourceDocument[]) {
+    if (saved.length === 0) return;
+
+    setDocumentList((current) => prependUniqueById(saved.map((item) => item.document), current));
+    setDocumentTotalCount((current) => current + saved.length);
+    setFileList((current) => prependUniqueById(saved.map((item) => item.sourceFile), current));
+    setSelectedDocumentId(`document-${saved[0].document.id}`);
   }
 
   async function bulkUploadSources(files: FileList | null) {
@@ -427,18 +471,14 @@ export function RFPWorkspace({
         },
         rfpId: rfp.id,
       });
-      const savedDocuments = saved.map((item) => item.document);
-      const savedFiles = saved.map((item) => item.sourceFile);
-      const nextDocuments = [...savedDocuments, ...documentList];
-
-      setDocumentList(nextDocuments);
-      setDocumentTotalCount((current) => current + savedDocuments.length);
-      setFileList((current) => [...savedFiles, ...current]);
-      if (savedDocuments[0]) setSelectedDocumentId(`document-${savedDocuments[0].id}`);
+      addUploadedSources(saved);
       setMessage(`${saved.length} source document${saved.length === 1 ? "" : "s"} saved with converted markdown.`);
     } catch (error) {
+      if (error instanceof PartialUploadError) {
+        addUploadedSources(error.completed as UploadedSourceDocument[]);
+      }
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not bulk upload source documents.");
+      setMessage(getErrorMessage(error, "Could not bulk upload source documents."));
     } finally {
       setIsBulkUploading(false);
       setBulkProgress("");
@@ -482,7 +522,7 @@ export function RFPWorkspace({
     } catch (error) {
       setIsSummarizing(false);
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not load document content.");
+      setMessage(getErrorMessage(error, "Could not load document content."));
       return;
     }
 
@@ -499,15 +539,17 @@ export function RFPWorkspace({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rfp_id: rfp.id, markdown }),
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? "Could not generate summary.");
+      const data = await readJsonResponse<{ summary: string; rfp?: { summary_generated_at?: string | null } }>(
+        response,
+        "Could not generate summary.",
+      );
       setSummary(data.summary);
       setSummaryGeneratedAt(data.rfp?.summary_generated_at ?? new Date().toISOString());
       setMessageType("info");
       setMessage("Summary generated and autosaved.");
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not generate summary.");
+      setMessage(getErrorMessage(error, "Could not generate summary."));
     } finally {
       setIsSummarizing(false);
     }
@@ -560,7 +602,7 @@ export function RFPWorkspace({
       if (generateAfterSave) await generateSummary(nextDocuments);
     } catch (error) {
       setMessageType("error");
-      setMessage(error instanceof Error ? error.message : "Could not save markdown.");
+      setMessage(getErrorMessage(error, "Could not save markdown."));
     } finally {
       setIsSavingMarkdown(false);
     }

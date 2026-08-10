@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { convertFile } from "@/lib/document-conversion";
 import { createDocument, deleteDocument } from "@/lib/documents";
+import { getErrorMessage } from "@/lib/errors";
 import { uploadRfpFile } from "@/lib/rfp-files";
 import type { Rfp, RfpDocument, RfpDocumentSourceType } from "@/lib/types";
 import "./doc-converter.css";
@@ -61,7 +62,7 @@ export function DocConverter({
     } catch (error) {
       setMarkdown("");
       setSourceFile(null);
-      setMessage(error instanceof Error ? error.message : "Could not convert this file.");
+      setMessage(getErrorMessage(error, "Could not convert this file."));
     } finally {
       setIsConverting(false);
     }
@@ -114,7 +115,7 @@ export function DocConverter({
       setSourceFile(null);
       setMessage("Markdown saved to the selected RFP.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not save this markdown.");
+      setMessage(getErrorMessage(error, "Could not save this markdown."));
     } finally {
       setIsSaving(false);
     }
@@ -131,7 +132,7 @@ export function DocConverter({
       setSavedTotalCount((current) => Math.max(0, current - 1));
       setMessage("Saved markdown deleted.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Could not delete this saved markdown.");
+      setMessage(getErrorMessage(error, "Could not delete this saved markdown."));
     }
   }
 

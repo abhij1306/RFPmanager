@@ -1,5 +1,6 @@
 import { convertFile } from "@/lib/document-conversion";
 import { createDocument } from "@/lib/documents";
+import { getErrorMessage, PartialUploadError } from "@/lib/errors";
 import { uploadRfpFile } from "@/lib/rfp-files";
 import type { RfpDocument, RfpFile } from "@/lib/types";
 
@@ -58,7 +59,16 @@ export async function uploadSourceDocuments({
   const saved: UploadedSourceDocument[] = [];
 
   for (const file of files) {
-    saved.push(await uploadSourceDocument({ file, rfpId, status }));
+    try {
+      saved.push(await uploadSourceDocument({ file, rfpId, status }));
+    } catch (error) {
+      const reason = getErrorMessage(error, "The upload failed.");
+      throw new PartialUploadError(
+        `Saved ${saved.length}/${files.length} source documents before ${file.name} failed: ${reason}`,
+        saved,
+        error,
+      );
+    }
     onProgress?.(saved.length, files.length, file);
   }
 

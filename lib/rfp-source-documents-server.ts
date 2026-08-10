@@ -1,5 +1,6 @@
 import { convertBufferToMarkdown } from "@/lib/document-conversion-server";
 import { createDocument } from "@/lib/documents";
+import { getErrorMessage, PartialUploadError } from "@/lib/errors";
 import { uploadRfpFile } from "@/lib/rfp-files";
 import type { RfpDocument, RfpFile } from "@/lib/types";
 
@@ -92,7 +93,16 @@ export async function uploadRemoteSourceDocuments({
   const saved: UploadedRemoteSourceDocument[] = [];
 
   for (const ref of refs) {
-    saved.push(await uploadRemoteSourceDocument({ ref, rfpId, status }));
+    try {
+      saved.push(await uploadRemoteSourceDocument({ ref, rfpId, status }));
+    } catch (error) {
+      const reason = getErrorMessage(error, "The upload failed.");
+      throw new PartialUploadError(
+        `Saved ${saved.length}/${refs.length} source documents before ${ref.name} failed: ${reason}`,
+        saved,
+        error,
+      );
+    }
     onProgress?.(saved.length, refs.length, ref);
   }
 

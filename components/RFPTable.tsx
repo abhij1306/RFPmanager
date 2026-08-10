@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 import { closingDateState, isClosingSoon } from "@/lib/date";
+import { getErrorMessage, PartialUploadError } from "@/lib/errors";
 import { uploadSourceDocuments } from "@/lib/rfp-source-documents";
 import { deleteRfp } from "@/lib/rfps";
 import type { Rfp } from "@/lib/types";
@@ -28,7 +29,7 @@ function applyFilter(rfp: Rfp, filter: Filter): boolean {
   return rfp.pipeline_stage === filter;
 }
 
-function RfpSourceUploadButton({ onUploaded, rfp }: { onUploaded: (count: number) => void; rfp: Rfp }) {
+function RfpSourceUploadButton({ rfp }: { rfp: Rfp }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
@@ -42,15 +43,17 @@ function RfpSourceUploadButton({ onUploaded, rfp }: { onUploaded: (count: number
     setProgress(`0/${selectedFiles.length}`);
 
     try {
-      const saved = await uploadSourceDocuments({
+      await uploadSourceDocuments({
         files: selectedFiles,
         onProgress: (completed, total) => setProgress(`${completed}/${total}`),
         rfpId: rfp.id,
       });
-      onUploaded(saved.length);
       router.refresh();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Could not bulk upload source documents.");
+      if (error instanceof PartialUploadError && error.completed.length > 0) {
+        router.refresh();
+      }
+      window.alert(getErrorMessage(error, "Could not bulk upload source documents."));
     } finally {
       setIsUploading(false);
       setProgress("");
@@ -96,7 +99,6 @@ export function RFPTable({
   const [filter, setFilter] = useState<Filter>("All");
   const [query, setQuery] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [uploadedDocumentCounts, setUploadedDocumentCounts] = useState<Record<string, number>>({});
 
   const filteredRfps = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -118,6 +120,8 @@ export function RFPTable({
     try {
       await deleteRfp(rfp.id);
       router.refresh();
+    } catch (error) {
+      window.alert(getErrorMessage(error, "Could not delete this RFP."));
     } finally {
       setDeletingId(null);
     }
@@ -213,7 +217,7 @@ export function RFPTable({
                   <td>
                     <div className="document-counts">
                       <Link className="count-link" href={`/rfp/${rfp.id}`} title="Source files and tender links">
-                        {rfp.document_links.length + (fileCounts[rfp.id] ?? 0) + (uploadedDocumentCounts[rfp.id] ?? 0)} sources
+                        {rfp.document_links.length + (fileCounts[rfp.id] ?? 0)} sources
                       </Link>
                       <Link className="count-link" href={`/rfp/${rfp.id}`} title="Converted Markdown documents">
                         {documentCounts[rfp.id] ?? 0} converted
@@ -221,15 +225,7 @@ export function RFPTable({
                     </div>
                   </td>
                   <td className="action-cell">
-                    <RfpSourceUploadButton
-                      onUploaded={(count) =>
-                        setUploadedDocumentCounts((current) => ({
-                          ...current,
-                          [rfp.id]: (current[rfp.id] ?? 0) + count,
-                        }))
-                      }
-                      rfp={rfp}
-                    />
+                    <RfpSourceUploadButton rfp={rfp} />
                     <button
                       aria-label={`Delete ${rfp.client_name}`}
                       className="icon-danger-button"

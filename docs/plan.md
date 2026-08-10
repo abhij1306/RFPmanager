@@ -116,10 +116,10 @@ rfp-manager/
 
 ---
 
-## npm deps (only new ones)
+## pnpm deps (only new ones)
 
 ```bash
-npm install @supabase/supabase-js mammoth turndown pdfjs-dist
+pnpm add @supabase/supabase-js mammoth turndown pdfjs-dist
 ```
 
 ---
