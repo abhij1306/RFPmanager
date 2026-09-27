@@ -38,19 +38,9 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
     workspaceError = loadError instanceof Error ? loadError.message : "Could not load RFP workspace.";
   }
 
-  const [displayTitle, issuedBy] = rfp.client_name.split(/\s+-\s+Issued by\s+/i);
+  const [displayTitle] = rfp.client_name.split(/\s+-\s+Issued by\s+/i);
   const formId = "rfp-detail-form";
   const sourceInputId = "rfp-source-upload";
-  const titleContent = (
-    <>
-      <h1>{displayTitle}</h1>
-      <p>
-        {[issuedBy ? `Issued by ${issuedBy}` : null, rfp.tender_code ? `Tender ${rfp.tender_code}` : null]
-          .filter(Boolean)
-          .join(" · ") || "Edit links, status, dates, and team notes for this RFP."}
-      </p>
-    </>
-  );
 
   return (
     <div className="shell">
@@ -58,12 +48,11 @@ export default async function RfpDetailPage({ params }: { params: Promise<{ id: 
         <div className="project-identity">
           {rfp.tender_link ? (
             <a className="project-title-link" href={rfp.tender_link} rel="noreferrer" target="_blank">
-              {titleContent}
+              <h1>{displayTitle}</h1>
             </a>
           ) : (
-            <div>{titleContent}</div>
+            <h1>{displayTitle}</h1>
           )}
-
         </div>
         <RFPHeaderActions formId={formId} gdriveLink={rfp.gdrive_link} rfpId={rfp.id} sourceInputId={sourceInputId} />
       </section>
