@@ -1,4 +1,4 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = { serverExternalPackages: ["@firecrawl/anydoc"] };
 
 export default nextConfig;

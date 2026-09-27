@@ -216,8 +216,8 @@ export function RFPTable({
                   </td>
                   <td>
                     <div className="document-counts">
-                      <Link className="count-link" href={`/rfp/${rfp.id}`} title="Source files and tender links">
-                        {rfp.document_links.length + (fileCounts[rfp.id] ?? 0)} sources
+                      <Link className="count-link" href={`/rfp/${rfp.id}`} title="Source files">
+                        {fileCounts[rfp.id] ?? 0} sources
                       </Link>
                       <Link className="count-link" href={`/rfp/${rfp.id}`} title="Converted Markdown documents">
                         {documentCounts[rfp.id] ?? 0} converted

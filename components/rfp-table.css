@@ -126,20 +126,20 @@ tbody tr:hover {
 
 .status-yes {
   color: var(--ok);
-  background: #f0fdf4;
-  border-color: #bbf7d0;
+  background: var(--status-ok-bg);
+  border-color: var(--status-ok-border);
 }
 
 .status-no {
   color: var(--danger);
-  background: #fef2f2;
-  border-color: #fecaca;
+  background: var(--status-no-bg);
+  border-color: var(--status-no-border);
 }
 
 .status-tbd {
-  color: #92400e;
-  background: #fffbeb;
-  border-color: #fef08a;
+  color: var(--status-tbd-text);
+  background: var(--status-tbd-bg);
+  border-color: var(--status-tbd-border);
 }
 
 .date-overdue {

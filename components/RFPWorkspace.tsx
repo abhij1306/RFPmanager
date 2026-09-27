@@ -7,19 +7,18 @@ import { createDocument, deleteDocument } from "@/lib/documents";
 import { getErrorMessage, PartialUploadError } from "@/lib/errors";
 import { createRfpFileDownloadUrl, deleteRfpFile, uploadRfpFile } from "@/lib/rfp-files";
 import { uploadSourceDocuments, type UploadedSourceDocument } from "@/lib/rfp-source-documents";
-import type { Rfp, RfpComment, RfpDocument, RfpDocumentSourceType, RfpFile, TenderDocumentLink } from "@/lib/types";
+import type { Rfp, RfpComment, RfpDocument, RfpDocumentSourceType, RfpFile } from "@/lib/types";
 
 type WorkspaceTab = "documents" | "summary" | "response" | "team";
 
 export type WorkspaceDocument = {
   id: string;
-  category: "link" | "source" | "response";
+  category: "source" | "response";
   title: string;
   meta: string;
   status: string;
   file?: RfpFile;
   document?: RfpDocument;
-  link?: TenderDocumentLink;
   preview?: string;
 };
 
@@ -76,7 +75,7 @@ async function readJsonResponse<Result>(response: Response, fallback: string): P
   return data;
 }
 
-function deriveWorkspaceDocuments(rfp: Rfp, documentList: RfpDocument[], fileList: RfpFile[]): WorkspaceDocument[] {
+function deriveWorkspaceDocuments(documentList: RfpDocument[], fileList: RfpFile[]): WorkspaceDocument[] {
   const filesById = new Map(fileList.map((file) => [file.id, file]));
   const pairedSourceFileIds = new Set<string>();
   const converted = documentList.map((document) => {
@@ -103,14 +102,6 @@ function deriveWorkspaceDocuments(rfp: Rfp, documentList: RfpDocument[], fileLis
       status: file.status ?? "Original file",
       file,
     }));
-  const links = rfp.document_links.map((link, index) => ({
-    id: `link-${index}`,
-    category: "link" as const,
-    title: link.name || link.url,
-    meta: link.url,
-    status: "External link",
-    link,
-  }));
   const responses = fileList
     .filter((file) => file.kind === "response")
     .map((file) => ({
@@ -122,14 +113,13 @@ function deriveWorkspaceDocuments(rfp: Rfp, documentList: RfpDocument[], fileLis
       file,
     }));
 
-  return [...links, ...converted, ...unconverted, ...responses];
+  return [...converted, ...unconverted, ...responses];
 }
 
 function workspaceStateKey({ comments, documentTotalCount, documents, files, rfp }: RFPWorkspaceProps): string {
   return JSON.stringify({
     commentIds: comments.map((comment) => comment.id),
     documentIds: documents.map((document) => document.id),
-    documentLinks: rfp.document_links,
     documentTotalCount,
     fileIds: files.map((file) => file.id),
     responseDraftSavedAt: rfp.response_draft_saved_at,
@@ -174,7 +164,7 @@ function RFPWorkspaceState({
   const [isBulkUploading, setIsBulkUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("documents");
   const [documentQuery, setDocumentQuery] = useState("");
-  const [documentFilter, setDocumentFilter] = useState<"all" | "source" | "link" | "response" | "converted" | "needs-conversion">("all");
+  const [documentFilter, setDocumentFilter] = useState<"all" | "source" | "response" | "converted" | "needs-conversion">("all");
   const [showConverter, setShowConverter] = useState(false);
   const [documentMarkdown, setDocumentMarkdown] = useState<Record<string, string>>({});
   const [loadingDocumentId, setLoadingDocumentId] = useState<string | null>(null);
@@ -188,8 +178,8 @@ function RFPWorkspaceState({
   const responseFiles = fileList.filter((file) => file.kind === "response");
   const hasResponseDraft = Boolean(rfp.response_draft_content?.trim());
   const workspaceDocuments = useMemo(
-    () => deriveWorkspaceDocuments(rfp, documentList, fileList),
-    [documentList, fileList, rfp],
+    () => deriveWorkspaceDocuments(documentList, fileList),
+    [documentList, fileList],
   );
   const visibleWorkspaceDocuments = useMemo(() => {
     const query = documentQuery.trim().toLowerCase();
@@ -615,7 +605,7 @@ function RFPWorkspaceState({
     { id: "team", label: "Activity", count: commentList.length },
   ];
   const documentGroups = [
-    { label: "Tender material", items: visibleWorkspaceDocuments.filter((item) => item.category === "link" || item.category === "source") },
+    { label: "Tender material", items: visibleWorkspaceDocuments.filter((item) => item.category === "source") },
     { label: "Responses", items: visibleWorkspaceDocuments.filter((item) => item.category === "response") },
   ].filter((group) => group.items.length > 0);
 
@@ -681,7 +671,7 @@ function RFPWorkspaceState({
             <label className="navigator-search"><span aria-hidden="true">⌕</span><input aria-label="Search documents" onChange={(event) => setDocumentQuery(event.target.value)} placeholder="Search documents" type="search" value={documentQuery} /></label>
             <div className="navigator-filters">
               <select aria-label="Filter documents" className="select" onChange={(event) => setDocumentFilter(event.target.value as typeof documentFilter)} value={documentFilter}>
-                <option value="all">All items</option><option value="source">Sources</option><option value="link">Tender links</option><option value="converted">Converted</option><option value="needs-conversion">Needs conversion</option><option value="response">Responses</option>
+                <option value="all">All items</option><option value="source">Sources</option><option value="converted">Converted</option><option value="needs-conversion">Needs conversion</option><option value="response">Responses</option>
               </select>
               <button className="button compact-button" onClick={() => setShowConverter(true)} type="button">Add document</button>
             </div>
@@ -691,7 +681,7 @@ function RFPWorkspaceState({
                   <div className="navigator-group-label">{group.label}<span>{group.items.length}</span></div>
                   {group.items.map((item) => (
                     <button aria-current={resolvedSelectedDocumentId === item.id ? "true" : undefined} className={`navigator-item ${resolvedSelectedDocumentId === item.id ? "active" : ""}`} key={item.id} onClick={() => selectDocument(item.id)} type="button">
-                      <span className="file-icon">{item.category === "link" ? "URL" : item.category === "response" ? "RSP" : item.document ? "MD" : "SRC"}</span>
+                      <span className="file-icon">{item.category === "response" ? "RSP" : item.document ? "MD" : "SRC"}</span>
                       <span className="document-main"><span className="document-title">{item.title}</span><span className="document-meta">{item.status} · {item.meta}</span></span>
                     </button>
                   ))}
@@ -704,15 +694,14 @@ function RFPWorkspaceState({
 
           <section aria-label="Document reader" className="document-reader">
             <div className="reader-heading">
-              <div className="reader-title"><span className="drop-kicker">{selectedDocument?.category === "link" ? "External source" : selectedDocument?.category === "response" ? "Response file" : "Tender document"}</span><h2>{selectedDocument?.title ?? "Select a document"}</h2><p>{selectedDocument?.meta ?? "Choose an item from the library to keep it in view."}</p></div>
+              <div className="reader-title"><span className="drop-kicker">{selectedDocument?.category === "response" ? "Response file" : "Tender document"}</span><h2>{selectedDocument?.title ?? "Select a document"}</h2><p>{selectedDocument?.meta ?? "Choose an item from the library to keep it in view."}</p></div>
               <div className="reader-actions">
-                {selectedDocument?.link ? <a className="ghost-button compact-button" href={selectedDocument.link.url} rel="noreferrer" target="_blank">Open link</a> : null}
                 {selectedDocument?.file ? <button className="ghost-button compact-button" onClick={() => void downloadFile(selectedDocument.file!)} type="button">Download</button> : null}
                 {selectedDocument?.document ? <button className="text-danger" onClick={() => void removeDocument(selectedDocument.document!.id)} type="button">Delete Markdown</button> : null}
                 {selectedDocument?.file ? <button className="text-danger" onClick={() => void removeFile(selectedDocument.file!)} type="button">Delete file</button> : null}
               </div>
             </div>
-            {selectedDocument?.document && loadingDocumentId === selectedDocument.document.id ? <div className="reader-empty"><strong>Loading document…</strong><p>Fetching the selected document content.</p></div> : selectedPreview ? <pre className="markdown-preview reader-preview">{selectedPreview}</pre> : selectedDocument ? <div className="reader-empty"><strong>Preview unavailable</strong><p>This item has no converted text. Use Download or Open link to view the original.</p>{selectedDocument.file ? <button className="button compact-button" onClick={() => void downloadFile(selectedDocument.file!)} type="button">Download original</button> : null}</div> : <div className="reader-empty"><strong>Your reading pane is ready</strong><p>Select a document from the library. The list and this pane scroll independently.</p></div>}
+            {selectedDocument?.document && loadingDocumentId === selectedDocument.document.id ? <div className="reader-empty"><strong>Loading document…</strong><p>Fetching the selected document content.</p></div> : selectedPreview ? <pre className="markdown-preview reader-preview">{selectedPreview}</pre> : selectedDocument ? <div className="reader-empty"><strong>Preview unavailable</strong><p>This item has no converted text. Use Download to view the original.</p>{selectedDocument.file ? <button className="button compact-button" onClick={() => void downloadFile(selectedDocument.file!)} type="button">Download original</button> : null}</div> : <div className="reader-empty"><strong>Your reading pane is ready</strong><p>Select a document from the library. The list and this pane scroll independently.</p></div>}
             {converterPanel}
           </section>
 

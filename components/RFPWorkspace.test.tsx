@@ -28,6 +28,19 @@ const rfp: Rfp = {
 };
 
 describe("RFPWorkspace", () => {
+  it("keeps imported tender links out of the document library", () => {
+    const linkedRfp: Rfp = {
+      ...rfp,
+      document_links: [{ name: "Submit response", url: "https://example.com/respond" }],
+    };
+
+    render(<RFPWorkspace comments={[]} documentTotalCount={0} documents={[]} files={[]} rfp={linkedRfp} />);
+
+    expect(screen.getByRole("button", { name: /documents/i })).toHaveTextContent("0");
+    expect(screen.queryByText("Submit response")).not.toBeInTheDocument();
+    expect(screen.getByText("No documents match this view.")).toBeInTheDocument();
+  });
+
   it("loads document Markdown only after the document is selected", async () => {
     const sourceDocument: RfpDocument = {
       id: "doc-1",

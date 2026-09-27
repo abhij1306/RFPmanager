@@ -20,14 +20,31 @@
   /* Accent — professional Indigo/Royal Blue */
   --accent:         #2563eb; /* Blue 600 */
   --accent-hover:   #1d4ed8; /* Blue 700 */
+  --accent-dark:    #174ea6;
   --accent-soft:    #eff6ff; /* Blue 50 */
   --accent-xsoft:   #f8fafc;
+  --doc-active-border: #8ab4f8;
+
+  /* Notices */
+  --notice-text:    var(--accent-dark);
+  --notice-bg:      var(--accent-xsoft);
+  --notice-border:  #cfd8fc;
+  --error-text:     #a50e0e;
+  --error-bg:       #fce8e6;
+  --error-border:   #f4c7c3;
 
   /* Status */
   --danger:         #dc2626; /* Red 600 */
   --danger-hover:   #b91c1c; /* Red 700 */
   --warning:        #ca8a04; /* Amber 600 */
   --ok:             #16a34a; /* Green 600 */
+  --status-ok-bg:      #f0fdf4;
+  --status-ok-border:  #bbf7d0;
+  --status-no-bg:      #fef2f2;
+  --status-no-border:  #fecaca;
+  --status-tbd-text:   #92400e;
+  --status-tbd-bg:     #fffbeb;
+  --status-tbd-border: #fef08a;
 
   /* Radius */
   --r-xs:   4px;
@@ -535,13 +552,16 @@ main {
 
 .form-field.full { grid-column: 1 / -1; }
 
-.form-field label {
+.form-field label,
+.form-field-label {
   color: var(--muted);
   font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
+
+.tender-link-list { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .rfp-form {
   display: grid;
@@ -650,7 +670,7 @@ main {
 }
 
 .drop-kicker {
-  color: #174ea6;
+  color: var(--accent-dark);
   font-size: 11px;
   font-weight: 850;
   letter-spacing: 0.06em;
@@ -664,9 +684,9 @@ main {
 .notice {
   margin-bottom: 12px;
   padding: 10px 12px;
-  color: #174ea6;
-  background: var(--accent-xsoft);
-  border: 1px solid #cfd8fc;
+  color: var(--notice-text);
+  background: var(--notice-bg);
+  border: 1px solid var(--notice-border);
   border-radius: var(--r-md);
   font-size: 13px;
   line-height: 1.5;
@@ -674,9 +694,9 @@ main {
 
 .notice.error,
 .error {
-  color: #a50e0e;
-  background: #fce8e6;
-  border-color: #f4c7c3;
+  color: var(--error-text);
+  background: var(--error-bg);
+  border-color: var(--error-border);
 }
 
 
@@ -993,7 +1013,7 @@ main {
 
 .document-row.active {
   background: var(--accent-soft);
-  border-color: #8ab4f8;
+  border-color: var(--doc-active-border);
 }
 
 .comment-row {
@@ -1012,7 +1032,7 @@ main {
   height: 30px;
   flex: 0 0 auto;
   place-items: center;
-  color: #174ea6;
+  color: var(--accent-dark);
   background: var(--accent-soft);
   border-radius: 6px;
   font-size: 10px;

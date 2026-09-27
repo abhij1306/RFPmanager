@@ -286,6 +286,18 @@ function GeneralInfoFields({
             value={form.gdrive_link ?? ""}
           />
         </div>
+        {form.document_links.length > 0 ? (
+          <div aria-label="Tender links" className="form-field full" role="group">
+            <span className="form-field-label">Tender links</span>
+            <div className="tender-link-list">
+              {form.document_links.map((link, index) => (
+                <a className="ghost-button" href={link.url} key={`${link.url}-${index}`} rel="noreferrer" target="_blank">
+                  {link.name?.trim() || `Tender link ${index + 1}`}
+                </a>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </div>
     </>
   );
@@ -324,6 +336,7 @@ function ContactDetailsFields({
             className="input"
             id="contact_phone"
             onChange={(event) => setField("contact_phone", event.target.value)}
+            type="tel"
             value={form.contact_phone ?? ""}
           />
         </div>

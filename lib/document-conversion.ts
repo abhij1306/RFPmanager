@@ -1,70 +1,82 @@
 import { cleanConvertedMarkdown } from "@/lib/document-markdown-cleanup";
-import {
-  getAllowedFileSourceType,
-  htmlToMarkdown,
-  normalizeXlsxInlineStrings,
-  parseCsv,
-  sheetRowsToMarkdown,
-  type ConversionResult,
-} from "@/lib/document-conversion-core";
+import { getAllowedFileSourceType, type ConversionResult } from "@/lib/document-conversion-core";
 
-async function convertDocx(file: File): Promise<string> {
-  const mammoth = await import("mammoth/mammoth.browser");
-  const arrayBuffer = await file.arrayBuffer();
-  const result = await mammoth.convertToHtml({ arrayBuffer });
-  return htmlToMarkdown(result.value);
+type PendingConversion = {
+  resolve: (markdown: string) => void;
+  reject: (error: Error) => void;
+  timeout: ReturnType<typeof setTimeout>;
+};
+
+const CONVERSION_TIMEOUT_MS = 120_000;
+let worker: Worker | null = null;
+let nextRequestId = 0;
+const pendingConversions = new Map<number, PendingConversion>();
+
+function failPendingConversions(error: Error) {
+  for (const pending of pendingConversions.values()) {
+    clearTimeout(pending.timeout);
+    pending.reject(error);
+  }
+  pendingConversions.clear();
+  worker?.terminate();
+  worker = null;
 }
 
-async function convertPdf(file: File): Promise<string> {
-  const pdfjs = await import("pdfjs-dist");
-  pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+function getConversionWorker(): Worker {
+  if (worker) return worker;
 
-  const arrayBuffer = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
-  const pages: string[] = [];
+  const conversionWorker = new Worker("/anydoc/worker.js", { type: "module" });
+  worker = conversionWorker;
+  conversionWorker.onmessage = (event: MessageEvent<{ id: number; markdown?: string; error?: string }>) => {
+    const { id, markdown, error } = event.data;
+    const pending = pendingConversions.get(id);
+    if (!pending) return;
+    pendingConversions.delete(id);
+    clearTimeout(pending.timeout);
 
-  for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
-    const page = await pdf.getPage(pageNumber);
-    const content = await page.getTextContent();
-    const text = content.items.map((item) => ("str" in item ? item.str : "")).join(" ");
-    pages.push(`## Page ${pageNumber}\n\n${text.trim()}`);
-  }
-
-  return cleanConvertedMarkdown(pages.join("\n\n"));
+    if (error) pending.reject(new Error(error));
+    else if (typeof markdown === "string") pending.resolve(markdown.trim());
+    else pending.reject(new Error("The document converter returned no text."));
+  };
+  conversionWorker.onerror = () => {
+    if (worker === conversionWorker) failPendingConversions(new Error("The document converter stopped unexpectedly."));
+  };
+  conversionWorker.onmessageerror = () => {
+    if (worker === conversionWorker) failPendingConversions(new Error("The document converter could not read the file."));
+  };
+  return conversionWorker;
 }
 
-async function convertSpreadsheet(file: File, extension: "xlsx" | "csv"): Promise<string> {
-  if (extension === "csv") {
-    return sheetRowsToMarkdown(file.name.replace(/\.[^.]+$/, "") || "CSV", parseCsv(await file.text()));
-  }
+async function convertWithAnydoc(file: File, sourceType: Exclude<ConversionResult["sourceType"], "markdown">): Promise<string> {
+  const bytes = new Uint8Array(await file.arrayBuffer());
 
-  const { default: readXlsxFile } = await import("read-excel-file/browser");
-  const sheets = await readXlsxFile(await normalizeXlsxInlineStrings(await file.arrayBuffer()));
-  return sheets.map(({ sheet, data }) => sheetRowsToMarkdown(sheet, data)).join("\n\n");
+  return new Promise((resolve, reject) => {
+    const id = ++nextRequestId;
+    const timeout = setTimeout(() => {
+      if (pendingConversions.has(id)) {
+        failPendingConversions(new Error("Document conversion timed out. Please try again."));
+      }
+    }, CONVERSION_TIMEOUT_MS);
+    pendingConversions.set(id, { resolve, reject, timeout });
+
+    try {
+      getConversionWorker().postMessage({ id, bytes, format: sourceType === "csv" ? "csv" : undefined }, [bytes.buffer]);
+    } catch (error) {
+      pendingConversions.delete(id);
+      clearTimeout(timeout);
+      reject(error);
+    }
+  });
 }
 
 export async function convertFile(file: File): Promise<ConversionResult> {
   const sourceType = getAllowedFileSourceType(file.name);
 
-  if (sourceType === "docx") {
-    return { markdown: await convertDocx(file), sourceType };
+  if (sourceType === "markdown") {
+    return { markdown: cleanConvertedMarkdown(await file.text()), sourceType };
   }
 
-  if (sourceType === "pdf") {
-    return { markdown: await convertPdf(file), sourceType };
-  }
-
-  if (sourceType === "xlsx" || sourceType === "csv") {
-    return { markdown: await convertSpreadsheet(file, sourceType), sourceType };
-  }
-
-  return { markdown: cleanConvertedMarkdown(await file.text()), sourceType: "markdown" };
+  return { markdown: await convertWithAnydoc(file, sourceType), sourceType };
 }
 
-export {
-  getAllowedFileSourceType,
-  normalizeXlsxInlineStrings,
-  parseCsv,
-  sheetRowsToMarkdown,
-  type ConversionResult,
-} from "@/lib/document-conversion-core";
+export { getAllowedFileSourceType, type ConversionResult } from "@/lib/document-conversion-core";
