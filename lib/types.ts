@@ -6,6 +6,7 @@ export type Rfp = {
   client_name: string;
   status: RfpStatus;
   closing_date: string | null;
+  closing_date_text?: string | null;
   tender_code: string | null;
   tender_link: string | null;
   gdrive_link: string | null;
@@ -28,6 +29,7 @@ export type RfpInput = {
   client_name: string;
   status: RfpStatus;
   closing_date: string | null;
+  closing_date_text?: string | null;
   tender_code: string | null;
   tender_link: string | null;
   gdrive_link: string | null;

@@ -114,6 +114,7 @@ describe("ChatGPT RFP routes", () => {
     expect(response.status).toBe(200);
     expect(updateRfpMock).toHaveBeenCalledWith("rfp-1", {
       closing_date: "2026-07-01",
+      closing_date_text: "Closes 1 July 2026",
       pipeline_stage: "Submitted",
     });
     expect(body.rfp.pipeline_stage).toBe("Submitted");

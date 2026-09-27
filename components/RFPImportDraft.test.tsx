@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { RFPImportDraft } from "@/components/RFPImportDraft";
 
@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({
     refresh: vi.fn(),
   }),
 }));
+vi.mock("@/lib/rfps", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/rfps")>()), listRfps: vi.fn().mockResolvedValue([]) }));
 
 describe("RFPImportDraft", () => {
   it("fills the create form when an import hash appears after the first render", async () => {
@@ -23,13 +24,12 @@ describe("RFPImportDraft", () => {
     const importHash = `#import=${encodeURIComponent(JSON.stringify(payload))}`;
     window.location.hash = "";
 
-    const { rerender } = render(<RFPImportDraft />);
+    render(<RFPImportDraft />);
     expect(screen.getByLabelText("Client Name")).toHaveValue("");
 
-    window.location.hash = importHash;
-    rerender(<RFPImportDraft />);
+    act(() => { window.location.hash = importHash; window.dispatchEvent(new Event("hashchange")); });
 
-    expect(screen.getByLabelText("Client Name")).toHaveValue("Website hosting and maintenance contract");
+    expect(await screen.findByLabelText("Client Name")).toHaveValue("Website hosting and maintenance contract");
     expect(screen.getByLabelText("Closing Date")).toHaveValue("2026-06-30");
     expect(screen.getByLabelText("Tender Code")).toHaveValue("T2026-001");
     expect(screen.getByLabelText("Tender Link")).toHaveValue("https://example.test/tender");

@@ -3,6 +3,7 @@ create table if not exists rfps (
   client_name text not null,
   status text not null default 'TBD' check (status in ('Yes', 'No', 'TBD')),
   closing_date date,
+  closing_date_text text,
   tender_code text,
   tender_link text,
   gdrive_link text,
@@ -22,6 +23,7 @@ create table if not exists rfps (
 );
 
 alter table rfps add column if not exists description text;
+alter table rfps add column if not exists closing_date_text text;
 alter table rfps add column if not exists contact_person text;
 alter table rfps add column if not exists contact_phone text;
 alter table rfps add column if not exists contact_email text;

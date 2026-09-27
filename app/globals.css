@@ -1,78 +1,4 @@
 /* ─────────────────────────────────────────────
-   DESIGN TOKENS
-───────────────────────────────────────────── */
-:root {
-  /* Surfaces */
-  --bg:             #f8fafc; /* Extremely soft slate-grey canvas */
-  --surface:        #ffffff;
-  --surface-raised: #f1f5f9; /* Slate 100 for subtle elevations */
-  --panel:          #ffffff;
-  --soft:           #f1f5f9;
-
-  /* Borders */
-  --line:           #e2e8f0; /* Slate 200 hairline border */
-  --line-strong:    #cbd5e1; /* Slate 300 for focused borders */
-
-  /* Text */
-  --text:           #0f172a; /* Slate 900 sharp body text */
-  --muted:          #475569; /* Slate 600 readable secondary text */
-
-  /* Accent — professional Indigo/Royal Blue */
-  --accent:         #2563eb; /* Blue 600 */
-  --accent-hover:   #1d4ed8; /* Blue 700 */
-  --accent-dark:    #174ea6;
-  --accent-soft:    #eff6ff; /* Blue 50 */
-  --accent-xsoft:   #f8fafc;
-  --doc-active-border: #8ab4f8;
-
-  /* Notices */
-  --notice-text:    var(--accent-dark);
-  --notice-bg:      var(--accent-xsoft);
-  --notice-border:  #cfd8fc;
-  --error-text:     #a50e0e;
-  --error-bg:       #fce8e6;
-  --error-border:   #f4c7c3;
-
-  /* Status */
-  --danger:         #dc2626; /* Red 600 */
-  --danger-hover:   #b91c1c; /* Red 700 */
-  --warning:        #ca8a04; /* Amber 600 */
-  --ok:             #16a34a; /* Green 600 */
-  --status-ok-bg:      #f0fdf4;
-  --status-ok-border:  #bbf7d0;
-  --status-no-bg:      #fef2f2;
-  --status-no-border:  #fecaca;
-  --status-tbd-text:   #92400e;
-  --status-tbd-bg:     #fffbeb;
-  --status-tbd-border: #fef08a;
-
-  /* Radius */
-  --r-xs:   4px;
-  --r-sm:   6px;
-  --r-md:   10px;
-  --r-lg:   14px;
-  --r-pill: 999px;
-
-  /* Elevation */
-  --shadow-xs:    0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow:       0 1px 3px rgba(15, 23, 42, 0.05), 0 1px 2px rgba(15, 23, 42, 0.03);
-  --shadow-md:    0 4px 6px -1px rgba(15, 23, 42, 0.05), 0 2px 4px -1px rgba(15, 23, 42, 0.03);
-  --shadow-modal: 0 20px 25px -5px rgba(15, 23, 42, 0.08), 0 10px 10px -5px rgba(15, 23, 42, 0.03);
-
-  /* Motion */
-  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
-  --t-fast:   0.1s ease;
-  --t-base:   0.15s ease;
-  /* Shared multi-property shorthand for interactive elements */
-  --t-interactive: background-color var(--t-fast), border-color var(--t-fast),
-                   color var(--t-fast), box-shadow var(--t-fast),
-                   transform var(--t-fast);
-
-  /* Typography — font families are handled dynamically by Next.js font loading */
-}
-
-
-/* ─────────────────────────────────────────────
    RESET / BASE
 ───────────────────────────────────────────── */
 *, *::before, *::after {
@@ -1344,37 +1270,12 @@ main {
   background: #fffbeb; 
   border-color: #fef08a; 
 }
-.header-more { position: relative; }
-.header-more summary { 
-  display: inline-flex; 
-  min-height: 32px; 
-  align-items: center; 
-  padding: 0 12px; 
-  color: var(--text); 
-  background: var(--surface); 
-  border: 1px solid var(--line); 
-  border-radius: var(--r-sm); 
-  cursor: pointer; 
-  font-size: 12px; 
-  font-weight: 600; 
-  list-style: none; 
-}
-.header-more summary::-webkit-details-marker { display: none; }
-.header-more summary::after { margin-left: 6px; content: "▾"; color: var(--muted); font-size: 10px; }
-.header-more[open] summary { border-color: var(--line-strong); }
-.header-more-menu { 
-  position: absolute; 
-  z-index: 4; 
-  top: calc(100% + 4px); 
-  right: 0; 
-  min-width: 140px; 
-  padding: 4px; 
-  background: var(--panel); 
-  border: 1px solid var(--line); 
-  border-radius: var(--r-sm); 
-  box-shadow: var(--shadow-md); 
-}
-.header-more-menu .danger-button { width: 100%; }
+.header-delete-button { display: inline-flex; width: 36px; height: 36px; align-items: center; justify-content: center; color: var(--danger-text, #b42318); background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-sm); cursor: pointer; }
+.header-delete-button:hover { background: var(--bg-alt); }
+.header-delete-button:disabled { cursor: wait; opacity: .5; }
+.create-upload-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }
+.tender-link-editor { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(180px, 2fr) auto; gap: 8px; align-items: center; width: 100%; }
+@media (max-width: 700px) { .tender-link-editor { grid-template-columns: minmax(0, 1fr); } }
 .document-counts { display: flex; gap: 8px; white-space: nowrap; }
 .document-counts .count-link { 
   min-height: 20px; 
@@ -1497,5 +1398,4 @@ main {
   .reader-actions { justify-content: flex-start; }
   .reader-preview { min-height: 360px; }
   .workspace-converter { max-height: none; }
-  .header-more-menu { left: 0; right: auto; }
 }

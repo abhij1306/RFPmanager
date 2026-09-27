@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { RFPTable } from "@/components/RFPTable";
-import { listCommentCountsByRfp } from "@/lib/comments";
 import { listDocumentCountsByRfp } from "@/lib/documents";
 import { listSourceFileCountsByRfp } from "@/lib/rfp-files";
 import { listTrackerRfps } from "@/lib/rfps";
@@ -19,7 +18,6 @@ export default async function DashboardPage() {
   let rfps: Rfp[] = [];
   let documentCounts: Record<string, number> = {};
   let fileCounts: Record<string, number> = {};
-  let commentCounts: Record<string, number> = {};
   let error: string | null = null;
   let workspaceError: string | null = null;
 
@@ -30,13 +28,11 @@ export default async function DashboardPage() {
   }
 
   try {
-    const [documentCountRows, commentCountRows, fileCountRows] = await Promise.all([
+    const [documentCountRows, fileCountRows] = await Promise.all([
       listDocumentCountsByRfp(),
-      listCommentCountsByRfp(),
       listSourceFileCountsByRfp(),
     ]);
     documentCounts = mapCountsByRfpId(documentCountRows);
-    commentCounts = mapCountsByRfpId(commentCountRows);
     fileCounts = mapCountsByRfpId(fileCountRows);
   } catch (loadError) {
     workspaceError = loadError instanceof Error ? loadError.message : "Could not load RFP workspace counts.";
@@ -46,16 +42,16 @@ export default async function DashboardPage() {
     <div className="shell">
       <section className="page-title">
         <div>
-          <h1>RFP Tracker</h1>
-          <p>Shared pipeline for prospects, active bids, submissions, and outcomes.</p>
+          <h1>Opportunity pipeline</h1>
+          <p>Prioritize tenders, see the bid decision, and open the work behind each opportunity.</p>
         </div>
         <Link className="button" href="/rfp/new">
-          Add RFP
+          New opportunity
         </Link>
       </section>
       {error ? <div className="notice error">{error}</div> : null}
       {workspaceError ? <div className="notice error">{workspaceError}</div> : null}
-      <RFPTable commentCounts={commentCounts} documentCounts={documentCounts} fileCounts={fileCounts} rfps={rfps} />
+      <RFPTable documentCounts={documentCounts} fileCounts={fileCounts} rfps={rfps} />
     </div>
   );
 }

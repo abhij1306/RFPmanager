@@ -222,9 +222,9 @@ In Claude, Cowork, or Claude Desktop, open Customize → Connectors → Add cust
 
 ## Tender Import
 
-Open `/bookmarklet`, copy the generated bookmarklet, and paste it into a browser bookmark URL. On a tender page, click the bookmark to send tender details and document links to `/api/rfp`; the app creates the RFP and opens its detail page.
+Open `/bookmarklet`, copy the generated bookmarklet, and paste it into a browser bookmark URL. On a tender page, click the bookmark to open a prefilled review form. Check the original deadline and captured links, then save. Captured links are references; download source files from the portal and upload them separately.
 
-For login-only portals, install the Debug Tender bookmarklet from `/bookmarklet`. Ask the assistant to open a real tender detail page after logging in, click Debug Tender, and save the copied JSON report. The report redacts emails, phone numbers, and URL query values, but still shows headings, labels, table rows, and document link patterns needed to improve extraction rules.
+For login-only portals, install the Debug Tender bookmarklet from `/bookmarklet`. On a tender detail page after logging in, click Debug Tender and preview the report before copying or sharing it. The report omits field values, heading text, and URL paths and parameters, but it may still contain confidential information.
 
 Good first debug targets are VendorPanel, Australian Tenders, TenderLink, SA Tenders, ACT Tenders, and VIC Tenders. Public/search-first portals such as AusTender, WA Tenders, GETS, NSW Buy, Queensland, and NT can usually be improved from visible tender detail pages plus the generic extractor.
 

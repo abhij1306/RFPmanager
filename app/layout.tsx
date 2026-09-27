@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Link from "next/link";
 import { AppNav } from "@/components/AppNav";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import "./globals.css";
+import "./design-system.css";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -25,24 +26,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html className={`${geistSans.variable} ${geistMono.variable}`} lang="en">
+    <html className={`${geistSans.variable} ${geistMono.variable}`} lang="en" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: "try { if (localStorage.getItem('rfp-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch {}" }} /></head>
       <body>
-        <header className="app-header">
-          <div className="header-left">
-            <Link className="brand" href="/">
-              <span className="brand-mark">RFP</span>
-              <span className="brand-name">Manager</span>
-            </Link>
-            <label className="global-search">
-              <span aria-hidden="true">⌕</span>
-              <input placeholder="Search proposals, clients..." type="search" />
-            </label>
+        <div className="app-frame">
+          <AppNav />
+          <div className="app-main-column">
+            <header className="app-topbar">
+              <span className="app-topbar-title">Opportunity workspace</span>
+              <div className="app-topbar-actions"><ThemeToggle /></div>
+            </header>
+            <main>{children}</main>
           </div>
-          <div className="header-right">
-            <AppNav />
-          </div>
-        </header>
-        <main>{children}</main>
+        </div>
       </body>
     </html>
   );

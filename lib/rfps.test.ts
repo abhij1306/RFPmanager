@@ -24,6 +24,7 @@ describe("RFP imports", () => {
   it("parses human-readable closing dates in partial RFP updates", () => {
     expect(normalizeRfpUpdate({ closing_date_text: "Closes 15 July 2026" })).toEqual({
       closing_date: "2026-07-15",
+      closing_date_text: "Closes 15 July 2026",
     });
   });
 

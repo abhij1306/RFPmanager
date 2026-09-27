@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { getErrorMessage } from "@/lib/errors";
+import { formatDateOnly } from "@/lib/date";
 import { uploadSourceDocuments } from "@/lib/rfp-source-documents";
 import { createRfp, updateRfp } from "@/lib/rfps";
 import type { Rfp, RfpInput } from "@/lib/types";
@@ -15,6 +16,7 @@ const emptyInput: RfpInput = {
   client_name: "",
   status: "TBD",
   closing_date: null,
+  closing_date_text: null,
   tender_code: null,
   tender_link: null,
   gdrive_link: null,
@@ -38,6 +40,7 @@ type RFPFormProps = Readonly<{
   rfp?: Rfp | null;
   sourceInputId?: string;
   collapsible?: boolean;
+  onCreateComplete?: () => void;
 }>;
 
 type EditableRfpInput = Pick<
@@ -45,6 +48,7 @@ type EditableRfpInput = Pick<
   | "client_name"
   | "status"
   | "closing_date"
+  | "closing_date_text"
   | "tender_code"
   | "tender_link"
   | "gdrive_link"
@@ -72,6 +76,7 @@ function inputFromRfp(rfp?: Rfp | null): RfpInput {
     client_name: rfp.client_name,
     status: rfp.status,
     closing_date: rfp.closing_date,
+    closing_date_text: rfp.closing_date_text ?? null,
     tender_code: rfp.tender_code,
     tender_link: rfp.tender_link,
     gdrive_link: rfp.gdrive_link,
@@ -95,6 +100,7 @@ function editableInputFromForm(form: RfpInput): EditableRfpInput {
     client_name: form.client_name.trim(),
     status: form.status,
     closing_date: form.closing_date || null,
+    closing_date_text: cleanValue(form.closing_date_text ?? ""),
     tender_code: cleanValue(form.tender_code ?? ""),
     tender_link: cleanValue(form.tender_link ?? ""),
     gdrive_link: cleanValue(form.gdrive_link ?? ""),
@@ -131,16 +137,10 @@ async function saveRfp({
   rfp?: Rfp | null;
 }>): Promise<Rfp> {
   if (isEditing && rfp) {
-    return updateRfp(rfp.id, editableInput);
+    return updateRfp(rfp.id, { ...editableInput, document_links: form.document_links });
   }
 
   return createRfp(createInputFromForm(form, editableInput));
-}
-
-function formatDateString(dateStr: string): string {
-  const [year, month, day] = dateStr.split("-");
-  const date = new Date(Number.parseInt(year, 10), Number.parseInt(month, 10) - 1, Number.parseInt(day, 10));
-  return date.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 function pluralSuffix(count: number): string {
@@ -193,7 +193,7 @@ function GeneralInfoFields({
   form: RfpInput;
   setField: SetField;
 }>) {
-  const reviewLabel = form.status === "TBD" ? "In review" : form.status;
+  const reviewLabel = form.status === "TBD" ? "Undecided" : form.status === "Yes" ? "Bid" : "Do not bid";
 
   return (
     <>
@@ -218,7 +218,7 @@ function GeneralInfoFields({
           />
         </div>
         <div className="form-field">
-          <label htmlFor="status">Status</label>
+          <label htmlFor="status">Bid decision</label>
           <select
             className="select"
             id="status"
@@ -227,7 +227,7 @@ function GeneralInfoFields({
           >
             {statuses.map((status) => (
               <option key={status} value={status}>
-                {status}
+                {status === "TBD" ? "Undecided" : status === "Yes" ? "Bid" : "Do not bid"}
               </option>
             ))}
           </select>
@@ -242,6 +242,7 @@ function GeneralInfoFields({
             value={form.closing_date ?? ""}
           />
         </div>
+        {form.closing_date_text ? <div className="form-field full"><label htmlFor="closing_date_text">Original deadline from tender</label><input className="input" id="closing_date_text" onChange={(event) => setField("closing_date_text", event.target.value || null)} value={form.closing_date_text} /><small>Check the date, time, and timezone against the tender before saving.</small></div> : null}
         <div className="form-field">
           <label htmlFor="pipeline_stage">Pipeline Stage</label>
           <select
@@ -291,9 +292,11 @@ function GeneralInfoFields({
             <span className="form-field-label">Tender links</span>
             <div className="tender-link-list">
               {form.document_links.map((link, index) => (
-                <a className="ghost-button" href={link.url} key={`${link.url}-${index}`} rel="noreferrer" target="_blank">
-                  {link.name?.trim() || `Tender link ${index + 1}`}
-                </a>
+                collapsible ? <a className="ghost-button" href={link.url} key={`${link.url}-${index}`} rel="noreferrer" target="_blank">{link.name?.trim() || `Tender link ${index + 1}`}</a> : <div className="tender-link-editor" key={index}>
+                  <input aria-label={`Tender link ${index + 1} name`} className="input" onChange={(event) => setField("document_links", form.document_links.map((item, itemIndex) => itemIndex === index ? { ...item, name: event.target.value } : item))} value={link.name} />
+                  <input aria-label={`Tender link ${index + 1} URL`} className="input" onChange={(event) => setField("document_links", form.document_links.map((item, itemIndex) => itemIndex === index ? { ...item, url: event.target.value } : item))} type="url" value={link.url} />
+                  <button aria-label={`Remove tender link ${index + 1}`} className="ghost-button" onClick={() => setField("document_links", form.document_links.filter((_, itemIndex) => itemIndex !== index))} type="button">Remove</button>
+                </div>
               ))}
             </div>
           </div>
@@ -420,9 +423,9 @@ function SummaryLink({
 function CollapsedSummary({ form }: Readonly<{ form: RfpInput }>) {
   return (
     <div className="trigger-summary">
-      <span className={statusClassName(form.status)}>{form.status}</span>
+      <span className={statusClassName(form.status)}>{form.status === "TBD" ? "Undecided" : form.status === "Yes" ? "Bid" : "Do not bid"}</span>
       <span className="summary-item stage-badge">{form.pipeline_stage}</span>
-      {form.closing_date ? <span className="summary-item date-badge">Due: {formatDateString(form.closing_date)}</span> : null}
+      {form.closing_date ? <span className="summary-item date-badge">Due: {formatDateOnly(form.closing_date)}</span> : null}
       {form.tender_link ? (
         <SummaryLink href={form.tender_link} title="Open Tender Link">
           🔗 Tender
@@ -440,18 +443,20 @@ function CollapsedSummary({ form }: Readonly<{ form: RfpInput }>) {
 function CollapsibleFields({
   form,
   isCollapsed,
+  isSaving,
   onToggle,
   setField,
 }: Readonly<{
   form: RfpInput;
   isCollapsed: boolean;
+  isSaving: boolean;
   onToggle: () => void;
   setField: SetField;
 }>) {
-  const triggerText = isCollapsed ? "Show RFP Details & Settings" : "Hide RFP Details & Settings";
+  const triggerText = isCollapsed ? "Edit opportunity details and decision" : "Close opportunity details";
 
   return (
-    <div className="collapsible-rfp-details">
+    <div className="collapsible-rfp-details" id="opportunity-details">
       <div className="collapsible-rfp-trigger">
         <button
           aria-expanded={!isCollapsed}
@@ -468,6 +473,7 @@ function CollapsibleFields({
         <div className="collapsible-form-grid">
           <FormSections collapsible form={form} setField={setField} />
         </div>
+        <div className="detail-save"><button className="button" disabled={isSaving} type="submit">{isSaving ? "Saving…" : "Save details"}</button></div>
       </div>
     </div>
   );
@@ -531,7 +537,6 @@ function EditingSourceUpload({
 }
 
 function CreateSourceUpload({
-  isCreating,
   isSaving,
   onFilesSelected,
   sourceFileCount,
@@ -539,7 +544,6 @@ function CreateSourceUpload({
   sourceInputRef,
   sourceUploadProgress,
 }: Readonly<{
-  isCreating: boolean;
   isSaving: boolean;
   onFilesSelected: (files: File[]) => void;
   sourceFileCount: number;
@@ -547,26 +551,18 @@ function CreateSourceUpload({
   sourceInputRef: React.RefObject<HTMLInputElement | null>;
   sourceUploadProgress: string;
 }>) {
-  if (!isCreating) {
-    return null;
-  }
-
   return (
-    <section className="form-card">
-      <div className="form-field full source-upload-field">
-        <label htmlFor={sourceInputId}>Source Documents</label>
+    <section className="page-title create-rfp-header">
+      <div><h1>Add RFP</h1><p>Create a shared record for a new tender or opportunity.</p></div>
+      <div className="create-upload-actions">
         <SourceUploadInput
           hidden
           onFilesSelected={onFilesSelected}
           sourceInputId={sourceInputId}
           sourceInputRef={sourceInputRef}
         />
-        <div className="inline-upload-control">
-          <button className="ghost-button" disabled={isSaving} onClick={() => sourceInputRef.current?.click()} type="button">
-            Bulk Upload
-          </button>
-          <span className="document-meta">{sourceFileLabel(sourceFileCount, sourceUploadProgress)}</span>
-        </div>
+        <button className="ghost-button" disabled={isSaving} onClick={() => sourceInputRef.current?.click()} type="button">Bulk Upload</button>
+        {sourceFileCount > 0 ? <span className="document-meta">{sourceFileLabel(sourceFileCount, sourceUploadProgress)}</span> : null}
       </div>
     </section>
   );
@@ -605,6 +601,7 @@ export function RFPForm({
   rfp,
   sourceInputId = "rfp-source-upload",
   collapsible = false,
+  onCreateComplete,
 }: RFPFormProps) {
   const router = useRouter();
   const [form, setForm] = useState<RfpInput>(() => initialInput ?? inputFromRfp(rfp));
@@ -657,6 +654,19 @@ export function RFPForm({
       return;
     }
 
+    if (form.document_links.some((link) => { try { return !["http:", "https:"].includes(new URL(link.url).protocol); } catch { return true; } })) {
+      setError("Tender links must use HTTP or HTTPS URLs.");
+      setIsSaving(false);
+      return;
+    }
+
+    if (isEditing && rfp && rfp.pipeline_stage !== "Submitted" && editableInput.pipeline_stage === "Submitted") {
+      if (!window.confirm("Confirm that this response was submitted outside RFP Manager? This changes only the pipeline stage; it does not send a proposal or change the bid decision.")) {
+        setIsSaving(false);
+        return;
+      }
+    }
+
     let saved: Rfp | null = null;
 
     try {
@@ -671,6 +681,7 @@ export function RFPForm({
         return;
       }
 
+      onCreateComplete?.();
       router.push(`/rfp/${saved.id}`);
       router.refresh();
     } catch (saveError) {
@@ -681,6 +692,7 @@ export function RFPForm({
         router.refresh();
 
         if (!isEditing) {
+          onCreateComplete?.();
           window.alert(`The RFP was created, but its source upload was incomplete. ${message}`);
           router.push(`/rfp/${saved.id}`);
           return;
@@ -698,6 +710,7 @@ export function RFPForm({
 
   return (
     <form className={`rfp-form ${collapsible ? "collapsible-rfp-form" : ""}`} id={formId} onSubmit={onSubmit}>
+      {isCreating ? <CreateSourceUpload isSaving={isSaving} onFilesSelected={setSourceFiles} sourceFileCount={sourceFiles.length} sourceInputId={sourceInputId} sourceInputRef={sourceInputRef} sourceUploadProgress={sourceUploadProgress} /> : null}
       {error ? <div className="notice error">{error}</div> : null}
       {notice ? <div className="notice">{notice}</div> : null}
 
@@ -713,6 +726,7 @@ export function RFPForm({
         <CollapsibleFields
           form={form}
           isCollapsed={isCollapsed}
+          isSaving={isSaving}
           onToggle={() => setIsCollapsed((current) => !current)}
           setField={setField}
         />
@@ -720,19 +734,10 @@ export function RFPForm({
         <FormSections collapsible={false} form={form} setField={setField} />
       )}
 
-      <CreateSourceUpload
-        isCreating={isCreating}
-        isSaving={isSaving}
-        onFilesSelected={setSourceFiles}
-        sourceFileCount={sourceFiles.length}
-        sourceInputId={sourceInputId}
-        sourceInputRef={sourceInputRef}
-        sourceUploadProgress={sourceUploadProgress}
-      />
       <CreateActions
         isCreating={isCreating}
         isSaving={isSaving}
-        onBack={() => router.push("/")}
+        onBack={() => { onCreateComplete?.(); router.push("/"); }}
         sourceUploadProgress={sourceUploadProgress}
       />
     </form>
