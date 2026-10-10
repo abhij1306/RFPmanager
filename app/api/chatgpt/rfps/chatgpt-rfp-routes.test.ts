@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GET as getRfpById, PATCH } from "@/app/api/chatgpt/rfps/[id]/route";
 import { GET, POST } from "@/app/api/chatgpt/rfps/route";
-import { createRfp, getRfp, listRfps, updateRfp } from "@/lib/rfps";
+import { createRfp, getRfp, listRfpPage, listRfps, updateRfp } from "@/lib/rfps";
 import type { Rfp } from "@/lib/types";
 
 vi.mock("@/lib/rfps", async () => {
@@ -11,6 +11,7 @@ vi.mock("@/lib/rfps", async () => {
     ...actual,
     createRfp: vi.fn(),
     getRfp: vi.fn(),
+    listRfpPage: vi.fn(),
     listRfps: vi.fn(),
     updateRfp: vi.fn(),
   };
@@ -19,6 +20,7 @@ vi.mock("@/lib/rfps", async () => {
 const createRfpMock = vi.mocked(createRfp);
 const getRfpMock = vi.mocked(getRfp);
 const listRfpsMock = vi.mocked(listRfps);
+const listRfpPageMock = vi.mocked(listRfpPage);
 const updateRfpMock = vi.mocked(updateRfp);
 const params = Promise.resolve({ id: "rfp-1" });
 
@@ -61,15 +63,38 @@ describe("ChatGPT RFP routes", () => {
     vi.clearAllMocks();
   });
 
-  it("lists RFPs through the RFP record module", async () => {
+  it("searches and paginates RFPs in the database", async () => {
+    listRfpPageMock.mockResolvedValue({ rfps: [rfp], total: 3 });
+
+    const response = await GET(request("https://rfp.example.test/api/chatgpt/rfps?search=opentext&offset=1&limit=99"));
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(listRfpPageMock).toHaveBeenCalledWith({ search: "opentext", offset: 1, limit: 25 });
+    expect(listRfpsMock).not.toHaveBeenCalled();
+    expect(body).toEqual({ rfps: [rfp], total: 3, offset: 1, limit: 25, has_more: true, next_offset: 2 });
+  });
+
+  it("falls back to in-memory filtering when the database path is unavailable", async () => {
+    listRfpPageMock.mockResolvedValue(null);
     listRfpsMock.mockResolvedValue([{ ...rfp }, { ...rfp, id: "rfp-2", client_name: "Other" }]);
 
     const response = await GET(request("https://rfp.example.test/api/chatgpt/rfps?search=opentext"));
     const body = await response.json();
 
     expect(response.status).toBe(200);
-    expect(listRfpsMock).toHaveBeenCalledOnce();
+    expect(body).toEqual({ rfps: [rfp], total: 1, offset: 0, limit: 25, has_more: false, next_offset: null });
+  });
+
+  it("retries multi-word searches in memory so cross-field matches still work", async () => {
+    listRfpPageMock.mockResolvedValue({ rfps: [], total: 0 });
+    listRfpsMock.mockResolvedValue([{ ...rfp }]);
+
+    const response = await GET(request("https://rfp.example.test/api/chatgpt/rfps?search=active%20tbd"));
+    const body = await response.json();
+
     expect(body.rfps).toEqual([rfp]);
+    expect(body.total).toBe(1);
   });
 
   it("creates RFPs through the RFP record module", async () => {

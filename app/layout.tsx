@@ -1,44 +1,33 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { AppNav } from "@/components/AppNav";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { CommandPalette } from "@/components/shell/CommandPalette";
+import { Sidebar } from "@/components/shell/Sidebar";
+import { ConfirmHost, Toaster } from "@/components/ui/feedback";
+import { themeBootScript } from "@/lib/theme";
 import "./globals.css";
-import "./design-system.css";
 
-const geistSans = Geist({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
-
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-});
+const geistSans = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const metadata: Metadata = {
   title: "RFP Manager",
-  description: "Team tracker and document converter for RFP workflows.",
+  description: "Upload tender documents once; read them anywhere through MCP.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html className={`${geistSans.variable} ${geistMono.variable}`} lang="en" suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: "try { if (localStorage.getItem('rfp-theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch {}" }} /></head>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+      </head>
       <body>
-        <div className="app-frame">
-          <AppNav />
-          <div className="app-main-column">
-            <header className="app-topbar">
-              <span className="app-topbar-title">Opportunity workspace</span>
-              <div className="app-topbar-actions"><ThemeToggle /></div>
-            </header>
-            <main>{children}</main>
-          </div>
+        <div className="app">
+          <Sidebar />
+          <main className="main">{children}</main>
         </div>
+        <CommandPalette />
+        <ConfirmHost />
+        <Toaster />
       </body>
     </html>
   );

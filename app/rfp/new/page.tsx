@@ -1,9 +1,5 @@
-import { RFPImportDraft } from "@/components/RFPImportDraft";
+import { NewRfp } from "@/components/NewRfp";
 
 export default function NewRfpPage() {
-  return (
-    <div className="shell">
-      <RFPImportDraft />
-    </div>
-  );
+  return <NewRfp />;
 }

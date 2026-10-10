@@ -1,7 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult, ToolAnnotations } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod/v4";
-import { RfpApiClient, createRfpApiClient } from "@/lib/mcp/rfp-api-client";
+import type { RfpApiClient } from "@/lib/mcp/rfp-api-client";
+import { createInProcessRfpApiClient } from "@/lib/mcp/rfp-in-process-fetch";
 
 const rfpId = z.string().uuid().describe("The UUID of the RFP record.");
 const optionalText = z.string().nullable().optional();
@@ -124,11 +125,11 @@ const descriptions = {
   updateRfp:
     "Update selected fields on an existing RFP. This changes the shared workspace; preserve fields the user did not ask to change. status is the Yes/No/TBD bid decision and pipeline_stage is the workflow stage.",
   listRfpDocuments:
-    "List saved Markdown document metadata and short previews for an RFP. Use this before reading full document content.",
+    "Default way to read an RFP's tender documents. Every uploaded source file (PDF, Word, Excel, CSV) is converted to Markdown on upload; this lists those converted documents with metadata, markdown_length and a short preview (paginated). Then read content with get_rfp_document_markdown. Use this, not list_rfp_source_files, whenever you need to read, summarize, or answer questions about the documents.",
   listRfpSourceFiles:
-    "List original source files saved for an RFP, including temporary download URLs. Use only when the raw original file is specifically needed.",
+    "Only when the user explicitly asks for an original/raw file (for example to download or forward it): list the original uploaded source files with temporary download URLs (valid 10 minutes). Do not use this to read document contents; the same content is already available as converted Markdown via list_rfp_documents and get_rfp_document_markdown.",
   getRfpDocumentMarkdown:
-    "Read a bounded Markdown excerpt from one saved document. Start at offset 0 and follow next_offset until has_more is false when a complete review is required.",
+    "Read the converted Markdown text of one document returned by list_rfp_documents, as a bounded excerpt. Start at offset 0 and follow next_offset until has_more is false when a complete review is required.",
   saveRfpSummary:
     "Save a summary created after reviewing the RFP's saved Markdown. This changes the shared workspace and does not call an LLM server-side.",
   listRfpResponses: "List generated response files already saved for an RFP.",
@@ -136,7 +137,7 @@ const descriptions = {
     "Save editable response draft text against an RFP. This changes the shared workspace; review the draft and confirm before calling.",
 };
 
-export function createRfpMcpServer(client: RfpApiClient = createRfpApiClient()): McpServer {
+export function createRfpMcpServer(client: RfpApiClient = createInProcessRfpApiClient()): McpServer {
   const server = new McpServer({ name: "rfpmanager", version: "1.0.0" });
 
   server.registerTool("list_rfps", { description: descriptions.listRfps, inputSchema: listRfpsSchema, annotations: readAnnotations }, (args) =>

@@ -1,66 +1,58 @@
 "use client";
 
-import { useState } from "react";
+import { Copy } from "lucide-react";
+import { toast } from "@/components/ui/feedback";
 import { buildBookmarklet, buildDebugBookmarklet } from "@/lib/bookmarklet";
+
+async function copy(value: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast("Bookmarklet copied. Paste it into a new bookmark's URL field.");
+  } catch {
+    toast("Copy failed. Select the code and copy it manually.", "error");
+  }
+}
 
 export function BookmarkletInstaller({ origin }: { origin: string }) {
   const bookmarklet = origin ? buildBookmarklet(origin) : "";
   const debugBookmarklet = buildDebugBookmarklet();
-  const [copyStatus, setCopyStatus] = useState("");
-
-  async function copyBookmarklet(value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopyStatus("Bookmarklet copied. Paste it into the bookmark URL field.");
-    } catch {
-      setCopyStatus("Copy failed. Select the code above and copy it manually.");
-    }
-  }
 
   return (
-    <div className="bookmarklet-grid">
-      <section className="panel bookmarklet-panel">
-        <span className="drop-kicker">One-time setup</span>
-        <h2>Install Extract Tender</h2>
-        <p>
-          Create a new browser bookmark, name it Extract Tender, and paste this JavaScript into the URL field.
-        </p>
-        <p>Destination: <strong>{origin || "Unavailable"}</strong>. Reinstall this bookmarklet after extraction updates.</p>
-        <textarea className="markdown-preview bookmarklet-code" readOnly value={bookmarklet} />
-        <div className="form-actions">
-          <button className="button" disabled={!bookmarklet} onClick={() => void copyBookmarklet(bookmarklet)} type="button">
-            Copy Bookmarklet
-          </button>
+    <div className="new-rfp">
+      <div className="stack">
+        <div className="panel">
+          <div className="panel-header">
+            <div><h2>Extract Tender</h2><p>Sends captures to {origin || "this app"}</p></div>
+            <button className="btn btn-primary btn-sm" disabled={!bookmarklet} onClick={() => void copy(bookmarklet)} type="button"><Copy size={14} />Copy bookmarklet</button>
+          </div>
+          <div className="panel-body stack">
+            <p className="muted">Create a bookmark named “Extract Tender” and paste this into its URL field. Reinstall after app updates.</p>
+            <textarea aria-label="Extract Tender bookmarklet code" className="code-block" readOnly value={bookmarklet} />
+          </div>
         </div>
-        {copyStatus ? <p aria-live="polite">{copyStatus}</p> : null}
-      </section>
-
-      <section className="panel bookmarklet-panel">
-        <span className="drop-kicker">Workflow</span>
-        <h2>Use on tender pages</h2>
-        <ol className="steps-list">
-          <li>Open the tender page normally in your browser.</li>
-          <li>Click the Extract Tender bookmark.</li>
-          <li>Review the captured details and links, then save the RFP.</li>
-          <li>Download original documents from the portal, upload them here, and convert them before assessment.</li>
-        </ol>
-      </section>
-
-      <section className="panel bookmarklet-panel bookmarklet-debug-panel">
-        <span className="drop-kicker">Login-only portals</span>
-        <h2>Install Debug Tender</h2>
-        <p>
-          Use this on authenticated tender pages when extraction needs tuning. Preview the diagnostic report before sharing;
-          it may still contain confidential tender information.
-        </p>
-        <textarea className="markdown-preview bookmarklet-code bookmarklet-code-small" readOnly value={debugBookmarklet} />
-        <div className="form-actions">
-          <button className="button secondary-button" onClick={() => void copyBookmarklet(debugBookmarklet)} type="button">
-            Copy Debug Bookmarklet
-          </button>
+        <div className="panel">
+          <div className="panel-header">
+            <div><h2>Debug Tender</h2><p>For login-only portals where extraction needs tuning</p></div>
+            <button className="btn btn-secondary btn-sm" onClick={() => void copy(debugBookmarklet)} type="button"><Copy size={14} />Copy</button>
+          </div>
+          <div className="panel-body stack">
+            <p className="muted">The diagnostic report can contain confidential tender text. Read it before sharing.</p>
+            <textarea aria-label="Debug Tender bookmarklet code" className="code-block" readOnly value={debugBookmarklet} />
+          </div>
         </div>
-        {copyStatus ? <p aria-live="polite">{copyStatus}</p> : null}
-      </section>
+      </div>
+      <div className="panel sticky-aside">
+        <div className="panel-header"><h2>How to use it</h2></div>
+        <div className="panel-body">
+          <ol className="steps">
+            <li>Open the tender page in your browser.</li>
+            <li>Click the Extract Tender bookmark.</li>
+            <li>Check the pre-filled details on the New RFP page.</li>
+            <li>Download the tender documents from the portal and drop them into the Documents panel.</li>
+            <li>Create. Agents can read the converted documents over MCP right away.</li>
+          </ol>
+        </div>
+      </div>
     </div>
   );
 }

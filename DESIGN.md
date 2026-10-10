@@ -1,197 +1,87 @@
 ---
 name: RFP Manager
-description: A calm, compact workspace for bid and proposal teams.
+description: A quiet, dense desktop workspace for uploading tender documents and reading what MCP agents read.
 colors:
-  canvas: "#f7f7f8"
-  surface-muted: "#f1f1f3"
-  surface-panel: "#fff"
-  surface-recessed: "#e9e9ed"
-  border: "#e7e7e9"
-  border-strong: "#d9d9dc"
-  text-primary: "#18181b"
-  text-secondary: "#3f3f46"
-  text-muted: "#5f6168"
-  text-placeholder: "#5f6168"
-  indigo: "#5e6ad2"
-  indigo-hover: "#4f58c4"
-  indigo-soft: "#f0f1fc"
-  indigo-border: "#ccd1f6"
-  success: "#0b6b4a"
-  success-soft: "#eff8f3"
-  warning: "#92580d"
-  warning-soft: "#fdf6ea"
-  danger: "#b42318"
-  danger-soft: "#fef2f2"
-  dark-canvas: "#0e0e0e"
-  dark-surface-muted: "#151515"
-  dark-surface-panel: "#1a1a1a"
-  dark-surface-recessed: "#282828"
-  dark-border: "#272727"
-  dark-text-primary: "#eee"
-  dark-text-secondary: "#bdbdbd"
-  dark-text-muted: "#a3a3a3"
-  dark-text-placeholder: "#858585"
+  bg: "#fbfbfc"
+  bg-sidebar: "#f5f5f7"
+  surface: "#ffffff"
+  surface-hover: "#f4f4f6"
+  surface-active: "#ececf0"
+  border: "#e7e7eb"
+  border-strong: "#d5d5db"
+  text: "#18181b"
+  text-2: "#4b4b53"
+  text-3: "#6e6e78"
+  accent: "#5b5bd6"
+  accent-hover: "#4f4fc8"
+  accent-soft: "#efeffd"
+  accent-text: "#4a4abf"
+  danger: "#c2341f"
+  warning: "#9a5600"
+  success: "#17754b"
+  dark-bg: "#101012"
+  dark-surface: "#18181b"
+  dark-border: "#26262b"
+  dark-text: "#ededef"
+  dark-accent: "#6d6ae0"
 typography:
-  headline:
-    fontFamily: "Geist, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "24px"
-    fontWeight: 650
-    letterSpacing: "-0.025em"
-  title:
-    fontFamily: "Geist, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "20px"
-    fontWeight: 650
-    letterSpacing: "-0.02em"
-  body:
-    fontFamily: "Geist, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "14px"
-    fontWeight: 400
-    lineHeight: 1.5
-  label:
-    fontFamily: "Geist, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "12px"
-    fontWeight: 600
-    letterSpacing: "0.06em"
+  page-title: { fontFamily: "Geist", fontSize: "22px", fontWeight: 600, letterSpacing: "-0.02em" }
+  detail-title: { fontFamily: "Geist", fontSize: "20px", fontWeight: 600, letterSpacing: "-0.018em" }
+  section: { fontFamily: "Geist", fontSize: "14px", fontWeight: 600 }
+  body: { fontFamily: "Geist", fontSize: "14px", fontWeight: 400, lineHeight: 1.5 }
+  ui-small: { fontFamily: "Geist", fontSize: "13px", fontWeight: 500 }
+  meta: { fontFamily: "Geist", fontSize: "12.5px", fontWeight: 400 }
+  reading: { fontFamily: "Geist", fontSize: "14.5px", lineHeight: 1.7, maxWidth: "76ch" }
+  code: { fontFamily: "Geist Mono", fontSize: "12.5px" }
 rounded:
-  xs: "4px"
   sm: "6px"
-  md: "10px"
+  md: "8px"
   lg: "12px"
   pill: "999px"
-spacing:
-  "1": "4px"
-  "2": "8px"
-  "3": "12px"
-  "4": "16px"
-  "5": "20px"
-  "6": "24px"
-  "8": "32px"
-components:
-  button-primary:
-    backgroundColor: "{colors.indigo}"
-    textColor: "#fff"
-    rounded: "{rounded.sm}"
-    height: "36px"
-    padding: "0 14px"
-  button-primary-hover:
-    backgroundColor: "{colors.indigo-hover}"
-  button-ghost:
-    backgroundColor: "{colors.surface-panel}"
-    textColor: "{colors.text-primary}"
-    rounded: "{rounded.sm}"
-    height: "36px"
-    padding: "0 14px"
-  input:
-    backgroundColor: "{colors.surface-recessed}"
-    textColor: "{colors.text-primary}"
-    rounded: "{rounded.sm}"
-    height: "36px"
-  panel:
-    backgroundColor: "{colors.surface-panel}"
-    rounded: "{rounded.md}"
-  filter-active:
-    backgroundColor: "{colors.indigo-soft}"
-    textColor: "{colors.indigo-hover}"
 ---
 
 # Design System: RFP Manager
 
 ## Overview
 
-**Creative North Star: "The Calm Workbench"**
+A canonical modern-SaaS workspace in the Linear/Notion register: neutral ladder, one indigo accent, Geist throughout, keyboard-first. Desktop only. The whole app is three surfaces: the RFP list, the New RFP form with a document dropzone, and the RFP page whose default tab is a document library beside a Markdown reader.
 
-The application is a compact working surface for reviewing opportunities, source documents, bid decisions, and response drafts. Its visual language comes from CrawlerAI Design System v4: Geist type, restrained indigo, neutral surface steps, and a 4px spacing rhythm. Information is dense enough for daily work but separated into legible panels and clear next actions.
+All tokens live as CSS custom properties in `app/globals.css`. Light is the default; dark follows the OS unless the user picks one (`html[data-theme]`, persisted in `localStorage["rfp-theme"]`).
 
-**Key Characteristics:**
+## Color
 
-- Neutral canvas and white panels in light mode; charcoal surfaces in dark mode.
-- Indigo marks actions, selected navigation, and focused controls.
-- Semantic status colors communicate decisions and dates with text as well as color.
-
-## Colors
-
-The palette pairs a quiet neutral ladder with one indigo accent. The frontmatter records the implemented light and dark colors; `html[data-theme="dark"]` in `app/design-system.css` switches the corresponding CSS variables at runtime.
-
-### Primary
-
-- **Workbench Indigo** (`--brand-accent`): Primary actions and the focus outline. Its hover token colors hovered actions and links; its soft and border tokens mark selected items.
-
-### Neutral
-
-- **Canvas / Panel / Well** (`--bg-base`, `--bg-panel`, `--bg-well`): Page background, card surface, and recessed form control surface.
-- **Muted Surface** (`--bg-alt`): Headers and selected navigation.
-- **Ink Tiers** (`--text-primary`, `--text-secondary`, `--text-muted`): Hierarchy for titles, supporting content, and metadata. `--text-subtle` is reserved for placeholders.
-- **Rules** (`--border-subtle`, `--border`, `--border-strong`): Dividers and control edges.
-
-### Semantic States
-
-- **Success, Warning, Danger:** Decision labels, date urgency, and status summaries use `--success-*`, `--warning-*`, and `--danger-*` text and soft background pairs. Each state has a readable label; color never carries the meaning alone.
-
-**The One Accent Rule.** Use indigo for interaction and selection; reserve semantic hues for their corresponding status meanings.
+- **Restrained strategy.** Neutrals carry 95% of the surface; indigo (`--accent`) marks primary actions, focus rings, the active tab underline, links in reading text and drag-over states. Nothing else is indigo.
+- **Semantic hues** are reserved: `--warning` for a closing date within 7 days, `--danger` for destructive actions and errors, `--success` for a finished upload. Each always carries a text label.
+- File-type badges tint their three-letter label only (PDF red, DOCX blue, XLSX/CSV green).
 
 ## Typography
 
-**Display and body font:** Geist with system sans-serif fallbacks. **Code font:** Geist Mono with monospace fallback.
-
-The interface uses a compact ladder. Page headings are 24px on desktop and 21px on narrow screens; section headings are 20px or 16px; the standard body and controls use 14px at 1.5 line height. Small metadata uses 13px. Uppercase navigation and table labels use 12px, 600 weight, and 0.06em tracking. Long reading content uses up to 75ch per paragraph and 1.7 line height.
-
-**The Reading Rule.** Keep documents in the Geist reading style with comfortable line spacing; use Geist Mono for code and raw data only.
+Geist for everything, Geist Mono for tender codes, RFP IDs and the Markdown editors. Body 14px; metadata 12.5–13px; page titles 22px; the RFP title 20px, clamped to two lines. Converted documents render at 14.5px / 1.7 with a 76ch measure. Numerals in tables and counts use tabular figures.
 
 ## Layout
 
-The desktop frame uses a 232px sticky sidebar and a flexible main column. A 60px top bar sits above content. The main shell is capped at 1510px with 32px side gutters and 32px top padding. The 4px spacing rhythm produces 4, 8, 12, 16, 20, 24, and 32px steps. Panels and work areas use these steps for gaps and internal padding.
-
-The desktop pipeline table has an 840px minimum width and scrolls within its panel on intermediate widths. Workspace tabs scroll horizontally. At 900px and below, navigation moves to a two-column strip above content, the shell uses 20px gutters, and overview columns stack. At 600px and below, the pipeline switches to stacked list items that expose closing date and bid decision immediately; gutters become 16px, the top bar is 48px, controls can fill the available width, and facts stack. The document navigator and reader stack at 720px and below.
-
-## Elevation & Depth
-
-Surface fill and borders establish most depth. Panels carry a restrained `--shadow` (`0 1px 2px rgba(24,24,27,.06)` in light mode). Menus and dialogs can use the stronger `--shadow-md` and `--shadow-modal`. Dark mode increases shadow opacity while relying on distinct charcoal fills.
-
-**The Quiet Surface Rule.** Use the light shadow for resting work panels; save stronger elevation for content that floats above the page.
-
-## Shapes
-
-Controls and navigation links use gently curved 6px corners. Cards and workspace panels use 10px corners; small icons and inline code use 4px. Pills use a fully rounded shape. Borders are thin and neutral, with indigo border color for selected or interactive states.
+- Fixed 232px sidebar (brand, search trigger, RFPs, New RFP, Tools, upload progress, theme) and a scrolling main column.
+- List and form pages: 1180px max width, 40px side padding.
+- RFP page: full-height. Header (breadcrumb, title, chips, tabs) above a body that fills the viewport; the Documents tab is a 340px library column and a reader that scroll independently.
 
 ## Components
 
-### Buttons
+- **Buttons:** 32px (28px small), 6px radius. Primary is indigo with a subtle inner highlight; secondary is white with a strong border; ghost has no chrome until hover. Keyboard hints render as `.kbd` chips inside the button.
+- **Inputs:** white with a strong border and a 3px indigo focus ring.
+- **Chips:** 26px pills on the RFP header for tender code (click to copy), closing date (amber when soon), and external links.
+- **Tabs:** text tabs with a 2px indigo underline; panels stay mounted so unsaved edits survive tab switches.
+- **Dropzone:** dashed 1.5px border that turns indigo on hover/drag; the whole Documents tab is also a drop target with a full-page overlay.
+- **Feedback:** toasts bottom-right (`aria-live`), a native `<dialog>` for confirmations, no browser `alert`/`confirm`.
+- **Command palette:** Ctrl/Cmd+K, searches RFPs by name or tender code plus a few actions.
+- **Skeletons:** every dynamic route has a `loading.tsx` shaped like the real layout so navigation paints instantly.
 
-Primary buttons use the indigo fill, white text, 36px minimum height, 14px horizontal padding, and 6px corners. Hover shifts to the indigo hover token. Ghost buttons use the panel fill and strong neutral border. Compact variants use a 32px minimum height. Disabled buttons lower opacity and show a disabled cursor.
+## Motion
 
-### Inputs / Fields
+Short and functional: 80–150ms colour transitions, a 140ms pop-in for menus, dialogs and the palette, a toast slide-up, and a transform-based upload progress bar. `prefers-reduced-motion` collapses all of it.
 
-Inputs, selects, and textareas sit on the recessed well with a transparent border and 6px corners. Focus brings the surface to panel white, turns the border indigo, and adds the theme's soft focus ring. Placeholders use the subtle text tier. Validation and status messages use semantic colors.
+## Do / Don't
 
-### Navigation
-
-Sidebar links are 36px high with 6px corners. Hover uses the muted fill; the active link uses the recessed fill and `aria-current="page"`. The top bar contains the theme toggle. At narrow widths, the sidebar becomes a horizontal page section with a two-column navigation grid.
-
-### Cards / Containers
-
-Panels use the panel surface, a neutral 1px border, 10px corners, and the light resting shadow. Board items use 8px corners, 14px padding, and a subtle hover border. Overview actions keep their title, explanation, and next step in one bounded row.
-
-### Pipeline Filters and Status
-
-Filters use compact 13px labels; the active filter receives indigo text on an indigo soft fill. Table headers use uppercase 12px labels; text columns align with their headers, while closing dates and source counts are centered. Rows retain 14px content and a muted hover fill. Decision labels pair a colored dot with explicit text.
-
-### Document Workspace
-
-Tabbed work areas keep 48px high tabs and an indigo underline for the active tab. Document navigation and reading surfaces are distinct panels; long content scrolls within the reader. Markdown headings, lists, quotes, code, and tables have reading-specific styles, with tables able to scroll horizontally.
-
-All interactive controls use the global 2px indigo `:focus-visible` outline with 2px offset and a soft ring. Motion is short (0.1–0.15s); reduced-motion preferences shorten transitions and animations.
-
-## Do's and Don'ts
-
-### Do:
-
-- **Do** use the CSS custom properties in `app/design-system.css` so both themes follow the same component rules.
-- **Do** express status with clear words beside semantic color.
-- **Do** maintain the 4px spacing rhythm and the compact Geist type ladder.
-- **Do** preserve visible keyboard focus and scroll access to wide tables and tab sets.
-
-### Don't:
-
-- **Don't** use the warm green visual styling from the workflow prototype as the product identity.
-- **Don't** use indigo to imply a bid decision or a closing-date warning.
-- **Don't** flatten document text into tiny, tightly packed UI labels.
+- **Do** keep converted text as the primary view of a document; originals are a secondary download.
+- **Do** keep every screen to one parallel data round trip and load Markdown bodies on demand.
+- **Don't** reintroduce pipeline stages, bid decisions or notes into the UI; they are not part of the workflow.
+- **Don't** use indigo for status; don't use colour without a text label.

@@ -3,7 +3,7 @@ import { toDocumentSummary } from "@/lib/chatgpt-documents";
 import { normalizeOpenAiFileRefs } from "@/lib/chatgpt-files";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
 import { uploadRemoteSourceDocuments } from "@/lib/rfp-source-documents-server";
-import { getRfp } from "@/lib/rfps";
+import { rfpExists } from "@/lib/rfps";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +16,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     const { id } = await params;
-    const rfp = await getRfp(id);
 
-    if (!rfp) {
+    if (!(await rfpExists(id))) {
       return NextResponse.json({ error: "RFP not found." }, { status: 404 });
     }
 

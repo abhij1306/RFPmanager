@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
 import { toSourceFileSummaries } from "@/lib/chatgpt-source-files";
-import { createRfpFileDownloadUrl, listFilesByRfp } from "@/lib/rfp-files";
-import { getRfp } from "@/lib/rfps";
+import { createRfpFileDownloadUrlBatch, listFilesByRfpAndKind } from "@/lib/rfp-files";
+import { rfpExists } from "@/lib/rfps";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +14,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params;
-  const rfp = await getRfp(id);
+  const files = await listFilesByRfpAndKind(id, "source");
 
-  if (!rfp) {
+  if (files.length === 0 && !(await rfpExists(id))) {
     return NextResponse.json({ error: "RFP not found." }, { status: 404 });
   }
 
-  const sourceFiles = await toSourceFileSummaries(await listFilesByRfp(id), createRfpFileDownloadUrl);
+  const sourceFiles = await toSourceFileSummaries(files, await createRfpFileDownloadUrlBatch(files));
 
   return NextResponse.json({ source_files: sourceFiles });
 }
