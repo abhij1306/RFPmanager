@@ -4,6 +4,7 @@ import { Copy, Trash2, UploadCloud } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 import { confirmAction, toast } from "@/components/ui/feedback";
+import { RfpPicker } from "@/components/ui/RfpPicker";
 import { convertFile } from "@/lib/document-conversion";
 import { displayTitle, formatRelativeTime } from "@/lib/display";
 import { createDocument, deleteDocument } from "@/lib/documents";
@@ -143,10 +144,7 @@ export function DocConverter({
             </div>
             <div className="field">
               <label className="field-label" htmlFor="convert-rfp">Save to RFP</label>
-              <select className="select" id="convert-rfp" onChange={(event) => setSelectedRfpId(event.target.value)} value={selectedRfpId}>
-                <option value="">Choose an RFP…</option>
-                {rfps.map((rfp) => <option key={rfp.id} value={rfp.id}>{displayTitle(rfp.client_name)}</option>)}
-              </select>
+              <RfpPicker id="convert-rfp" onChange={setSelectedRfpId} rfps={rfps} value={selectedRfpId} />
             </div>
           </div>
           <div className="panel-footer">
