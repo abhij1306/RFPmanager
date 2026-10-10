@@ -121,8 +121,8 @@ export function CommandPalette() {
         {loadError ? <li className="palette-empty">Could not load RFPs. Actions still work.</li> : null}
         {items.map((item, index) => (
           <li key={item.id} role="presentation">
-            {index === 0 && item.kind === "rfp" ? <div className="palette-group">RFPs</div> : null}
-            {index === firstActionIndex ? <div className="palette-group">Actions</div> : null}
+            {index === 0 && item.kind === "rfp" ? <div aria-hidden="true" className="palette-group">RFPs</div> : null}
+            {index === firstActionIndex ? <div aria-hidden="true" className="palette-group">Actions</div> : null}
             <div
               aria-selected={index === clampedIndex}
               className="palette-item"

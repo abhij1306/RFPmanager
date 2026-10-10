@@ -49,9 +49,8 @@ export const inProcessRfpFetch: RfpApiClientFetch = async (input, init) => {
     const handler = route.module[request.method as "GET" | "POST" | "PATCH"];
     if (!handler) return jsonError(405, `Method ${request.method} not allowed.`);
 
-    const params = Object.fromEntries(route.params.map((name, index) => [name, decodeURIComponent(match[index + 1])]));
-
     try {
+      const params = Object.fromEntries(route.params.map((name, index) => [name, decodeURIComponent(match[index + 1])]));
       return await handler(request, { params: Promise.resolve(params) as Promise<never> });
     } catch {
       // Next.js answers an unhandled route error with a bare 500; mirror that so callers see the same error.

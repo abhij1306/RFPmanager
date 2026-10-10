@@ -62,7 +62,7 @@ export function MarkdownTab({
 
   async function download(file: RfpFile) {
     try {
-      window.open(await createRfpFileDownloadUrl(file), "_blank", "noopener,noreferrer");
+      window.location.assign(await createRfpFileDownloadUrl(file));
     } catch (error) {
       toast(getErrorMessage(error, "Could not create a download link."), "error");
     }

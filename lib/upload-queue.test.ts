@@ -15,7 +15,11 @@ vi.mock("@/lib/document-conversion", async () => {
 });
 const deleted: string[] = [];
 vi.mock("@/lib/rfp-files", () => ({
-  uploadRfpFile: vi.fn(async ({ originalFilename, rfpId }: { originalFilename: string; rfpId: string }): Promise<Partial<RfpFile>> => ({ id: `file-${originalFilename}`, rfp_id: rfpId, original_filename: originalFilename })),
+  // The upload settles after conversion has already failed, which is the race the cleanup must survive.
+  uploadRfpFile: vi.fn(async ({ originalFilename, rfpId }: { originalFilename: string; rfpId: string }): Promise<Partial<RfpFile>> => {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    return { id: `file-${originalFilename}`, rfp_id: rfpId, original_filename: originalFilename };
+  }),
   deleteRfpFile: vi.fn(async (file: RfpFile) => { deleted.push(file.id); }),
 }));
 vi.mock("@/lib/documents", () => ({
@@ -35,7 +39,7 @@ describe("upload queue", () => {
       new File(["d"], "legacy.xls"),
     ]);
 
-    await waitFor(() => expect(result.current.every((item) => item.state.kind === "done" || item.state.kind === "failed")).toBe(true));
+    await waitFor(() => expect(result.current.length === 4 && result.current.every((item) => item.state.kind === "done" || item.state.kind === "failed")).toBe(true));
 
     const outcome = Object.fromEntries(result.current.map((item) => [
       item.file.name,

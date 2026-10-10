@@ -46,7 +46,8 @@ async function processItem(item: UploadItem) {
     getAllowedFileSourceType(item.file.name);
     const title = fileTitle(item.file);
     // The original upload and the in-browser conversion are independent, so run them together.
-    const [conversion, savedFile] = await Promise.all([
+    // allSettled waits for both, so a fast conversion failure can't race past an upload still in flight.
+    const [conversion, upload] = await Promise.allSettled([
       convertFile(item.file),
       uploadRfpFile({
         body: item.file,
@@ -56,20 +57,20 @@ async function processItem(item: UploadItem) {
         rfpId: item.rfpId,
         status: "Converted",
         title,
-      }).then((file) => {
-        sourceFile = file;
-        return file;
       }),
     ]);
+    if (upload.status === "fulfilled") sourceFile = upload.value;
+    if (conversion.status === "rejected") throw conversion.reason;
+    if (upload.status === "rejected") throw upload.reason;
     const document = await createDocument({
       rfp_id: item.rfpId,
-      source_file_id: savedFile.id,
+      source_file_id: upload.value.id,
       title,
       source_filename: item.file.name,
-      source_type: conversion.sourceType,
-      markdown: conversion.markdown,
+      source_type: conversion.value.sourceType,
+      markdown: conversion.value.markdown,
     });
-    update(item.id, { kind: "done", document, sourceFile: savedFile });
+    update(item.id, { kind: "done", document, sourceFile: upload.value });
   } catch (error) {
     if (sourceFile) await deleteRfpFile(sourceFile).catch(() => undefined);
     update(item.id, { kind: "failed", message: getErrorMessage(error, "Upload failed.") });

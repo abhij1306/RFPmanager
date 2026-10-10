@@ -77,7 +77,7 @@ export function DetailsTab({ editing, onEditingChange, rfp }: { editing: boolean
         <div className="doc-pane-header">
           <div><h2>Edit details</h2><p>Changes are visible to MCP agents straight away.</p></div>
           <div className="header-actions">
-            <button className="btn btn-ghost" disabled={isSaving} onClick={() => onEditingChange(false)} type="button">Cancel</button>
+            <button className="btn btn-ghost" disabled={isSaving} onClick={() => { setValues(saved); setError(null); onEditingChange(false); }} type="button">Cancel</button>
             <button className="btn btn-primary" disabled={isSaving} type="submit">{isSaving ? "Saving…" : "Save details"}</button>
           </div>
         </div>
