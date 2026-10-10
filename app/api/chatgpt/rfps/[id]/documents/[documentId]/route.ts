@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
-import { createDocumentExcerpt } from "@/lib/chatgpt-documents";
-import { getDocumentByRfp } from "@/lib/documents";
-import { getRfp } from "@/lib/rfps";
+import { getDocumentExcerptForChatgpt } from "@/lib/chatgpt-documents";
 
 export const dynamic = "force-dynamic";
 
@@ -17,23 +15,18 @@ export async function GET(
   }
 
   const { id, documentId } = await params;
-  const rfp = await getRfp(id);
-
-  if (!rfp) {
-    return NextResponse.json({ error: "RFP not found." }, { status: 404 });
-  }
-
-  const document = await getDocumentByRfp(id, documentId);
-
-  if (!document) {
-    return NextResponse.json({ error: "Document not found for this RFP." }, { status: 404 });
-  }
-
   const searchParams = new URL(request.url).searchParams;
   const offset = Number(searchParams.get("offset") ?? "0");
   const limit = Number(searchParams.get("limit") ?? undefined);
+  const result = await getDocumentExcerptForChatgpt(id, documentId, { offset, limit });
 
-  return NextResponse.json({
-    document: createDocumentExcerpt(document, { offset, limit }),
-  });
+  if (result.status === "rfp_not_found") {
+    return NextResponse.json({ error: "RFP not found." }, { status: 404 });
+  }
+
+  if (result.status === "document_not_found") {
+    return NextResponse.json({ error: "Document not found for this RFP." }, { status: 404 });
+  }
+
+  return NextResponse.json({ document: result.document });
 }

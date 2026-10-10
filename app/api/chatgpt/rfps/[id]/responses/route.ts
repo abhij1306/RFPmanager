@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAllowedFileSourceType, normalizeOpenAiFileRefs } from "@/lib/chatgpt-files";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
-import { createRfpFileDownloadUrl, listFilesByRfp, uploadRfpFile } from "@/lib/rfp-files";
-import { getRfp } from "@/lib/rfps";
+import { createRfpFileDownloadUrlBatch, listFilesByRfpAndKind, uploadRfpFile } from "@/lib/rfp-files";
+import { rfpExists } from "@/lib/rfps";
 
 export const dynamic = "force-dynamic";
 
@@ -28,20 +28,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   }
 
   const { id } = await params;
-  const rfp = await getRfp(id);
+  const files = await listFilesByRfpAndKind(id, "response");
 
-  if (!rfp) {
+  if (files.length === 0 && !(await rfpExists(id))) {
     return NextResponse.json({ error: "RFP not found." }, { status: 404 });
   }
 
-  const files = await listFilesByRfp(id);
+  const createDownloadUrl = await createRfpFileDownloadUrlBatch(files);
   const responses = await Promise.all(
-    files
-      .filter((file) => file.kind === "response")
-      .map(async (file) => ({
-        ...file,
-        download_url: await createRfpFileDownloadUrl(file),
-      })),
+    files.map(async (file) => ({
+      ...file,
+      download_url: await createDownloadUrl(file),
+    })),
   );
 
   return NextResponse.json({ responses });
@@ -56,9 +54,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     const { id } = await params;
-    const rfp = await getRfp(id);
 
-    if (!rfp) {
+    if (!(await rfpExists(id))) {
       return NextResponse.json({ error: "RFP not found." }, { status: 404 });
     }
 

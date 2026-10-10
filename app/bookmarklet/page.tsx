@@ -17,13 +17,13 @@ export default async function BookmarkletPage() {
   }
 
   return (
-    <div className="shell">
-      <section className="page-title">
+    <div className="page">
+      <header className="page-header">
         <div>
-          <h1>Tender Import Bookmarklet</h1>
-          <p>Install a browser bookmark that extracts tender details from the page you are viewing.</p>
+          <h1>Capture bookmarklet</h1>
+          <p>One click on a tender page pre-fills a new RFP with its title, deadline, contacts and document links.</p>
         </div>
-      </section>
+      </header>
       <BookmarkletInstaller origin={origin} />
     </div>
   );

@@ -1,4 +1,4 @@
-import { createTableHelpers, listCountsByRfp, type RfpCount } from "@/lib/table-helpers";
+import { callOptionalRpc, createTableHelpers, listCountsByRfp, type RfpCount } from "@/lib/table-helpers";
 import { toError } from "@/lib/errors";
 import { getSupabase } from "@/lib/supabase";
 import type { RfpFile, RfpFileInput, RfpFileKind } from "@/lib/types";
@@ -115,6 +115,13 @@ export function listFileCountsByRfp(): Promise<RfpCount[]> {
 }
 
 export async function listSourceFileCountsByRfp(): Promise<RfpCount[]> {
+  const rows = await callOptionalRpc<{ rfp_id: string; count: number | string }>(
+    "list_source_file_counts_by_rfp",
+    undefined,
+    "Could not count source files.",
+  );
+  if (rows) return rows.map((row) => ({ rfp_id: row.rfp_id, count: Number(row.count) }));
+
   const supabase = getSupabase();
   const { data, error } = await supabase.from("rfp_files").select("rfp_id").eq("kind", "source");
   if (error) throw toError(error, "Could not count source files.");
@@ -124,4 +131,56 @@ export async function listSourceFileCountsByRfp(): Promise<RfpCount[]> {
     counts.set(row.rfp_id, (counts.get(row.rfp_id) ?? 0) + 1);
   }
   return Array.from(counts, ([rfp_id, count]) => ({ rfp_id, count }));
+}
+
+/** Files of one kind for an RFP (uses the rfp_id, kind, created_at index). */
+export async function listFilesByRfpAndKind(rfpId: string, kind: RfpFileKind): Promise<RfpFile[]> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("rfp_files")
+    .select(selectFields)
+    .eq("rfp_id", rfpId)
+    .eq("kind", kind)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    throw toError(error, "Could not list rfp_files for this RFP.");
+  }
+
+  return (data ?? []) as RfpFile[];
+}
+
+/**
+ * Sign download URLs for many files with one storage call (createSignedUrls) instead of one call per file.
+ * Returns a per-file resolver producing the same URL format as createRfpFileDownloadUrl; any file the batch
+ * could not sign (or the whole batch failing) falls back to createRfpFileDownloadUrl for that file.
+ */
+export async function createRfpFileDownloadUrlBatch(files: RfpFile[]): Promise<(file: RfpFile) => Promise<string>> {
+  const signed = new Map<string, string>();
+
+  if (files.length > 1) {
+    try {
+      const supabase = getSupabase();
+      const { data, error } = await supabase.storage.from(RFP_FILES_BUCKET).createSignedUrls(
+        files.map((file) => file.storage_path),
+        60 * 10,
+      );
+
+      if (!error) {
+        for (const item of data ?? []) {
+          if (item.path && item.signedUrl && !item.error) signed.set(item.path, item.signedUrl);
+        }
+      }
+    } catch {
+      // Fall back to per-file signing below.
+    }
+  }
+
+  return async (file) => {
+    const signedUrl = signed.get(file.storage_path);
+    if (!signedUrl) return createRfpFileDownloadUrl(file);
+    if (!file.original_filename) return signedUrl;
+    // Mirrors storage-js: encodeURI(`${url}${signedURL}&${new URLSearchParams({ download })}`).
+    return `${signedUrl}&${encodeURI(new URLSearchParams({ download: file.original_filename }).toString())}`;
+  };
 }

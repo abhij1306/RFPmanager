@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ValidationError, validateResponseDraftInput } from "@/lib/chatgpt-files";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
-import { getRfp, updateRfpResponseDraft } from "@/lib/rfps";
+import { isRfpConfirmedMissing, updateRfpResponseDraft } from "@/lib/rfps";
 
 export const dynamic = "force-dynamic";
 
@@ -12,14 +12,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return chatgptAuthErrorResponse(validation);
   }
 
+  const { id } = await params;
+
   try {
-    const { id } = await params;
-    const rfp = await getRfp(id);
-
-    if (!rfp) {
-      return NextResponse.json({ error: "RFP not found." }, { status: 404 });
-    }
-
+    // Write first; an update of a missing RFP touches no rows and fails, and only then do we pay for the
+    // existence check that turns the failure into a 404.
     const draft = validateResponseDraftInput(await request.json());
     const updated = await updateRfpResponseDraft(id, draft.title, draft.content);
 
@@ -32,6 +29,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       },
     });
   } catch (error) {
+    if (await isRfpConfirmedMissing(id)) {
+      return NextResponse.json({ error: "RFP not found." }, { status: 404 });
+    }
+
     const isValidationError = error instanceof ValidationError || (error instanceof Error && error.name === "ValidationError");
 
     return NextResponse.json(

@@ -1,7 +1,7 @@
 import { DocConverter } from "@/components/DocConverter";
-import { listDocumentMetadataPage } from "@/lib/documents";
-import { listRfps } from "@/lib/rfps";
-import type { Rfp, RfpDocument } from "@/lib/types";
+import { listDocumentMetadataPage, type RfpDocumentPage } from "@/lib/documents";
+import { getErrorMessage } from "@/lib/errors";
+import { listRfpOptions, type RfpOption } from "@/lib/rfp-queries";
 
 export const dynamic = "force-dynamic";
 
@@ -13,39 +13,30 @@ function pageNumber(value: string | undefined): number {
 }
 
 export default async function ConvertPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
-  const { page: pageValue } = await searchParams;
-  const page = pageNumber(pageValue);
-  let documents: RfpDocument[] = [];
-  let documentTotalCount = 0;
-  let rfps: Rfp[] = [];
+  const page = pageNumber((await searchParams).page);
+  let rfps: RfpOption[] = [];
+  let documentPage: RfpDocumentPage = { documents: [], totalCount: 0 };
   let error: string | null = null;
-  let libraryError: string | null = null;
 
   try {
-    rfps = await listRfps();
+    [rfps, documentPage] = await Promise.all([
+      listRfpOptions(),
+      listDocumentMetadataPage({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE }),
+    ]);
   } catch (loadError) {
-    error = loadError instanceof Error ? loadError.message : "Could not load RFPs.";
-  }
-
-  try {
-    const documentPage = await listDocumentMetadataPage({ limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE });
-    documents = documentPage.documents;
-    documentTotalCount = documentPage.totalCount;
-  } catch (loadError) {
-    libraryError = loadError instanceof Error ? loadError.message : "Could not load saved Markdown library.";
+    error = getErrorMessage(loadError, "Could not load the converter.");
   }
 
   return (
-    <div className="shell">
-      <section className="page-title">
+    <div className="page">
+      <header className="page-header">
         <div>
-          <h1>Document Converter</h1>
-          <p>Convert documents or spreadsheets to Markdown, then save the output with the right RFP.</p>
+          <h1>Document converter</h1>
+          <p>Convert one file to Markdown and attach it to any RFP. For a whole tender pack, upload on the RFP page instead.</p>
         </div>
-      </section>
-      {error ? <div className="notice error">{error}</div> : null}
-      {libraryError ? <div className="notice error">{libraryError}</div> : null}
-      <DocConverter documentTotalCount={documentTotalCount} documents={documents} key={page} page={page} pageSize={PAGE_SIZE} rfps={rfps} />
+      </header>
+      {error ? <div className="notice notice-error notice-stack">{error}</div> : null}
+      <DocConverter documentTotalCount={documentPage.totalCount} documents={documentPage.documents} key={page} page={page} pageSize={PAGE_SIZE} rfps={rfps} />
     </div>
   );
 }

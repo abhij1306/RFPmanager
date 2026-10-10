@@ -1,57 +1,35 @@
+import { Plus } from "lucide-react";
 import Link from "next/link";
-import { RFPTable } from "@/components/RFPTable";
-import { listDocumentCountsByRfp } from "@/lib/documents";
-import { listSourceFileCountsByRfp } from "@/lib/rfp-files";
-import { listTrackerRfps } from "@/lib/rfps";
-import type { Rfp } from "@/lib/types";
+import { RfpList } from "@/components/RfpList";
+import { getErrorMessage } from "@/lib/errors";
+import { listRfpIndex, type RfpListItem } from "@/lib/rfp-queries";
 
 export const dynamic = "force-dynamic";
 
-function mapCountsByRfpId(items: Array<{ rfp_id: string; count: number }>): Record<string, number> {
-  return items.reduce<Record<string, number>>((counts, item) => {
-    counts[item.rfp_id] = item.count;
-    return counts;
-  }, {});
-}
-
-export default async function DashboardPage() {
-  let rfps: Rfp[] = [];
-  let documentCounts: Record<string, number> = {};
-  let fileCounts: Record<string, number> = {};
+export default async function RfpsPage() {
+  let rfps: RfpListItem[] = [];
   let error: string | null = null;
-  let workspaceError: string | null = null;
 
   try {
-    rfps = await listTrackerRfps();
+    rfps = await listRfpIndex();
   } catch (loadError) {
-    error = loadError instanceof Error ? loadError.message : "Could not load RFPs.";
-  }
-
-  try {
-    const [documentCountRows, fileCountRows] = await Promise.all([
-      listDocumentCountsByRfp(),
-      listSourceFileCountsByRfp(),
-    ]);
-    documentCounts = mapCountsByRfpId(documentCountRows);
-    fileCounts = mapCountsByRfpId(fileCountRows);
-  } catch (loadError) {
-    workspaceError = loadError instanceof Error ? loadError.message : "Could not load RFP workspace counts.";
+    error = getErrorMessage(loadError, "Could not load RFPs.");
   }
 
   return (
-    <div className="shell">
-      <section className="page-title">
+    <div className="page">
+      <header className="page-header">
         <div>
-          <h1>Opportunity pipeline</h1>
-          <p>Prioritize tenders, see the bid decision, and open the work behind each opportunity.</p>
+          <h1>RFPs</h1>
+          <p>{rfps.length} tenders · documents are converted to Markdown for MCP agents</p>
         </div>
-        <Link className="button" href="/rfp/new">
-          New opportunity
+        <Link className="btn btn-primary" href="/rfp/new">
+          <Plus size={15} />
+          New RFP
         </Link>
-      </section>
-      {error ? <div className="notice error">{error}</div> : null}
-      {workspaceError ? <div className="notice error">{workspaceError}</div> : null}
-      <RFPTable documentCounts={documentCounts} fileCounts={fileCounts} rfps={rfps} />
+      </header>
+      {error ? <div className="notice notice-error notice-stack">{error}</div> : null}
+      <RfpList rfps={rfps} />
     </div>
   );
 }

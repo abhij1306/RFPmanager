@@ -31,11 +31,9 @@ cp .env.example .env.local
 
 3. Add your Supabase URL and anon key to `.env.local`.
 
-4. Add `GROQ_API_KEY` to enable summary generation.
+4. Create or update the database tables using [supabase/schema.sql](supabase/schema.sql).
 
-5. Create or update the database tables using [supabase/schema.sql](supabase/schema.sql).
-
-6. Run the app:
+5. Run the app:
 
 ```bash
 pnpm dev
@@ -47,8 +45,9 @@ The current document converter runs in the browser. Team members do not need to 
 
 The app still needs:
 
-- A Supabase project for shared RFP, comment, and saved Markdown storage.
-- `GROQ_API_KEY` only if summary generation should work.
+- A Supabase project for shared RFP, file, and converted Markdown storage.
+
+Summaries are written by MCP-connected agents (`save_rfp_summary`); the app no longer generates them itself.
 
 PPTX conversion is not currently supported. If PPTX support is added through a server-side tool such as MarkItDown, Docling, or LibreOffice, document the required Python/system packages and deployment setup here before sharing that version with the team.
 
@@ -207,7 +206,6 @@ If you later need per-user access, audit trails, or stronger isolation, replace 
 3. Add these environment variables:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `GROQ_API_KEY`
    - `CHATGPT_ACTIONS_API_KEY`
    - `RFPMANAGER_API_BASE_URL` (the deployed app origin, for example `https://rfpmanager.vercel.app`)
 4. Deploy.

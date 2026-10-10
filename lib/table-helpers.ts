@@ -76,3 +76,55 @@ export async function listCountsByRfp(functionName: string): Promise<RfpCount[]>
     count: Number(item.count),
   }));
 }
+
+/** PostgREST/Postgres error codes for "this RPC function does not exist (yet)". */
+export function isMissingFunctionError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const { code } = error as { code?: unknown };
+  return code === "PGRST202" || code === "42883";
+}
+
+const MISSING_RPC_RETRY_MS = 5 * 60 * 1000;
+const missingRpcUntil = new Map<string, number>();
+
+/**
+ * Optional performance RPCs live in supabase/perf-2026-10.sql. Until they are applied, callers fall
+ * back to plain table queries. Remember a miss for a few minutes so warm instances don't pay a failed
+ * round trip on every request, while still picking the function up soon after it is created.
+ */
+export function isRpcKnownMissing(functionName: string): boolean {
+  const until = missingRpcUntil.get(functionName);
+  if (until === undefined) return false;
+  if (Date.now() < until) return true;
+  missingRpcUntil.delete(functionName);
+  return false;
+}
+
+export function markRpcMissing(functionName: string): void {
+  missingRpcUntil.set(functionName, Date.now() + MISSING_RPC_RETRY_MS);
+}
+
+/**
+ * Call an optional RPC. Resolves to `null` when the function is not installed so the caller can use its
+ * fallback; any other error is thrown.
+ */
+export async function callOptionalRpc<Row>(
+  functionName: string,
+  args: Record<string, unknown> | undefined,
+  fallbackMessage: string,
+): Promise<Row[] | null> {
+  if (isRpcKnownMissing(functionName)) return null;
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase.rpc(functionName, args);
+
+  if (error) {
+    if (isMissingFunctionError(error)) {
+      markRpcMissing(functionName);
+      return null;
+    }
+    throw toError(error, fallbackMessage);
+  }
+
+  return (data ?? []) as Row[];
+}

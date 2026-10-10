@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { convertBufferToMarkdown } from "@/lib/document-conversion-server";
 import { createDocument } from "@/lib/documents";
-import { uploadRfpFile } from "@/lib/rfp-files";
+import { deleteRfpFile, uploadRfpFile } from "@/lib/rfp-files";
 import { uploadRemoteSourceDocuments } from "@/lib/rfp-source-documents-server";
 
 vi.mock("@/lib/document-conversion-server", () => ({
@@ -13,12 +13,14 @@ vi.mock("@/lib/documents", () => ({
 }));
 
 vi.mock("@/lib/rfp-files", () => ({
+  deleteRfpFile: vi.fn(),
   uploadRfpFile: vi.fn(),
 }));
 
 const convertBufferToMarkdownMock = vi.mocked(convertBufferToMarkdown);
 const createDocumentMock = vi.mocked(createDocument);
 const uploadRfpFileMock = vi.mocked(uploadRfpFile);
+const deleteRfpFileMock = vi.mocked(deleteRfpFile);
 
 describe("remote RFP source documents", () => {
   afterEach(() => {
@@ -130,5 +132,41 @@ describe("remote RFP source documents", () => {
     expect(convertBufferToMarkdownMock).not.toHaveBeenCalled();
     expect(uploadRfpFileMock).not.toHaveBeenCalled();
     expect(createDocumentMock).not.toHaveBeenCalled();
+  });
+
+  it("removes the stored original when conversion fails, so no source file is left without Markdown", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("bytes")));
+    const storedFile = { id: "file-9", storage_path: "rfp-1/source/file-9.pdf" } as never;
+    uploadRfpFileMock.mockResolvedValue(storedFile);
+    convertBufferToMarkdownMock.mockRejectedValue(new Error("Scanned PDF needs OCR"));
+    deleteRfpFileMock.mockResolvedValue(undefined);
+
+    await expect(
+      uploadRemoteSourceDocuments({
+        refs: [{ downloadLink: "https://files.example.test/scan.pdf", mimeType: "application/pdf", name: "Scan.pdf" }],
+        rfpId: "rfp-1",
+      }),
+    ).rejects.toThrow("Saved 0/1 source documents before Scan.pdf failed: Scanned PDF needs OCR");
+
+    expect(deleteRfpFileMock).toHaveBeenCalledWith(storedFile);
+    expect(createDocumentMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps input order and reports what was saved when a later file fails", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(async () => new Response("bytes")));
+    convertBufferToMarkdownMock.mockImplementation(async ({ filename }) => {
+      if (filename === "c.pdf") throw new Error("bad file");
+      return { markdown: `# ${filename}`, sourceType: "pdf" };
+    });
+    uploadRfpFileMock.mockImplementation(async ({ originalFilename }) => ({ id: `file-${originalFilename}` }) as never);
+    createDocumentMock.mockImplementation(async (input) => ({ id: `doc-${input.source_filename}` }) as never);
+    deleteRfpFileMock.mockResolvedValue(undefined);
+    const refs = ["a.pdf", "b.pdf", "c.pdf"].map((name) => ({ downloadLink: `https://f.test/${name}`, mimeType: null, name }));
+
+    const error = await uploadRemoteSourceDocuments({ refs, rfpId: "rfp-1" }).catch((caught) => caught);
+
+    expect(error.message).toBe("Saved 2/3 source documents before c.pdf failed: bad file");
+    expect(error.completed.map((item: { document: { id: string } }) => item.document.id)).toEqual(["doc-a.pdf", "doc-b.pdf"]);
+    expect(deleteRfpFileMock).toHaveBeenCalledWith({ id: "file-c.pdf" });
   });
 });

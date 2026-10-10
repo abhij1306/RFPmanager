@@ -37,9 +37,9 @@ function request(body: unknown) {
   });
 }
 
-async function importRoute(updateRfpResponseDraft = vi.fn()) {
+async function importRoute(updateRfpResponseDraft = vi.fn(), rfpMissing = false) {
   vi.doMock("@/lib/rfps", () => ({
-    getRfp: vi.fn().mockResolvedValue(rfp),
+    isRfpConfirmedMissing: vi.fn().mockResolvedValue(rfpMissing),
     updateRfpResponseDraft,
   }));
 
@@ -75,5 +75,31 @@ describe("ChatGPT response draft text route", () => {
 
     await expect(response.json()).resolves.toEqual({ error: "database failed" });
     expect(response.status).toBe(500);
+  });
+
+  it("returns 404 when the save fails because the RFP does not exist", async () => {
+    process.env.CHATGPT_ACTIONS_API_KEY = "secret";
+    const { POST } = await importRoute(vi.fn().mockRejectedValue(new Error("Cannot coerce the result")), true);
+
+    const response = await POST(request({ title: "Draft", content: "Response body" }), {
+      params: Promise.resolve({ id: "rfp-1" }),
+    });
+
+    await expect(response.json()).resolves.toEqual({ error: "RFP not found." });
+    expect(response.status).toBe(404);
+  });
+
+  it("returns the saved draft without an extra existence lookup", async () => {
+    process.env.CHATGPT_ACTIONS_API_KEY = "secret";
+    const saved = { ...rfp, response_draft_title: "Draft", response_draft_content: "Body", response_draft_saved_at: "2026-06-02T00:00:00.000Z" };
+    const { POST } = await importRoute(vi.fn().mockResolvedValue(saved));
+
+    const response = await POST(request({ title: "Draft", content: "Body" }), { params: Promise.resolve({ id: "rfp-1" }) });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      rfp: saved,
+      response_draft: { title: "Draft", content: "Body", saved_at: "2026-06-02T00:00:00.000Z" },
+    });
   });
 });

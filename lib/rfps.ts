@@ -317,3 +317,93 @@ export async function updateRfpResponseDraft(id: string, title: string, content:
   if (!data) throw new Error("Could not save the response draft.");
   return withRfpDefaults(data);
 }
+
+/** Cheap existence probe (id only) used instead of loading the full RFP row just to produce a 404. */
+export async function rfpExists(id: string): Promise<boolean> {
+  const supabase = getSupabase();
+  const { data, error } = await supabase.from("rfps").select("id").eq("id", id).maybeSingle();
+
+  if (error) {
+    throw toError(error, "Could not load the RFP.");
+  }
+
+  return data !== null;
+}
+
+const rfpSearchColumns = ["client_name", "tender_code", "description", "notes", "tender_link", "pipeline_stage", "status"];
+
+/**
+ * Build a PostgREST `or` filter that matches `term` as a case-insensitive substring of any searchable column.
+ * LIKE wildcards (% _ \) are escaped, and the value is double-quoted so commas, dots, colons and parentheses
+ * are safe. Returns null when the term cannot be expressed exactly (PostgREST always treats `*` as a wildcard).
+ */
+export function buildRfpSearchFilter(term: string): string | null {
+  if (term.includes("*")) return null;
+
+  const pattern = `%${term.replace(/[\\%_]/g, "\\$&")}%`;
+  const quoted = `"${pattern.replace(/["\\]/g, "\\$&")}"`;
+  return rfpSearchColumns.map((column) => `${column}.ilike.${quoted}`).join(",");
+}
+
+export type RfpPage = {
+  rfps: Rfp[];
+  total: number;
+};
+
+/**
+ * Search + paginate RFPs in the database (same ordering as listRfps, plus id as a stable tiebreaker).
+ * Resolves to null when the query cannot be answered this way (un-escapable search term or an older schema),
+ * so callers can fall back to listRfps + in-memory filtering.
+ */
+export async function listRfpPage({
+  limit,
+  offset,
+  search,
+}: {
+  limit: number;
+  offset: number;
+  search?: string | null;
+}): Promise<RfpPage | null> {
+  const term = search?.trim() ?? "";
+  const filter = term ? buildRfpSearchFilter(term) : "";
+  if (filter === null) return null;
+
+  const supabase = getSupabase();
+  const select = (columns: string, head = false) => {
+    const query = supabase.from("rfps").select(columns, { count: "exact", head });
+    return filter ? query.or(filter) : query;
+  };
+
+  const { count, data, error } = await select(selectFields)
+    .order("closing_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (error) {
+    if (isMissingColumnError(error)) return null;
+
+    // Offset past the end: PostgREST answers 416 instead of an empty page, so count separately.
+    if ((error as { code?: unknown }).code === "PGRST103") {
+      const counted = await select("id", true);
+      if (counted.error) throw toError(counted.error, "Could not list RFPs.");
+      return { rfps: [], total: counted.count ?? 0 };
+    }
+
+    throw toError(error, "Could not list RFPs.");
+  }
+
+  return {
+    rfps: ((data ?? []) as Partial<Rfp>[]).map(withRfpDefaults),
+    total: count ?? 0,
+  };
+}
+
+/** True only when the RFP is confirmed absent; lookup failures resolve to false. Used on error paths. */
+export async function isRfpConfirmedMissing(id: string): Promise<boolean> {
+  try {
+    return !(await rfpExists(id));
+  } catch {
+    return false;
+  }
+}

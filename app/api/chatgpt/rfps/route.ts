@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { chatgptAuthErrorResponse, validateChatgptApiKey } from "@/lib/chatgpt-auth";
-import { filterRfpsForChatgpt, paginateRfpsForChatgpt } from "@/lib/chatgpt-rfps";
-import { createRfp, listRfps, normalizeImportedRfp } from "@/lib/rfps";
+import { listRfpsForChatgpt } from "@/lib/chatgpt-rfps";
+import { createRfp, normalizeImportedRfp } from "@/lib/rfps";
 import type { RfpImportInput } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -20,9 +20,8 @@ export async function GET(request: Request) {
     const rawLimit = searchParams.get("limit");
     const offset = rawOffset !== null && !Number.isNaN(Number(rawOffset)) ? Number(rawOffset) : 0;
     const limit = rawLimit !== null && !Number.isNaN(Number(rawLimit)) ? Number(rawLimit) : 0;
-    const filteredRfps = filterRfpsForChatgpt(await listRfps(), search);
 
-    return NextResponse.json(paginateRfpsForChatgpt(filteredRfps, { offset, limit }));
+    return NextResponse.json(await listRfpsForChatgpt(search, { offset, limit }));
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Could not list RFPs." }, { status: 500 });
   }

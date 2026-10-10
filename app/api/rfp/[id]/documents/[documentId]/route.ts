@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getDocumentByRfp } from "@/lib/documents";
+import { getDocumentMarkdownByRfp } from "@/lib/documents";
 import { getErrorMessage } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,7 @@ export async function GET(
 ) {
   try {
     const { id, documentId } = await params;
-    const document = await getDocumentByRfp(id, documentId);
+    const document = await getDocumentMarkdownByRfp(id, documentId);
 
     if (!document) {
       return NextResponse.json({ error: "Document not found for this RFP." }, { status: 404 });

@@ -1,3 +1,4 @@
+import { listRfpPage, listRfps } from "@/lib/rfps";
 import type { Rfp } from "@/lib/types";
 
 export const DEFAULT_RFP_LIST_LIMIT = 25;
@@ -54,20 +55,46 @@ export function filterRfpsForChatgpt(rfps: Rfp[], search: string | null | undefi
   return rfps.filter((rfp) => searchableRfpText(rfp).includes(normalizedSearch));
 }
 
-export function paginateRfpsForChatgpt(rfps: Rfp[], options: RfpListOptions = {}): PaginatedRfps {
+export function resolveRfpListWindow(options: RfpListOptions = {}): { offset: number; limit: number } {
   const offset = clampNonNegativeInteger(options.offset, 0);
   const requestedLimit = clampNonNegativeInteger(options.limit, DEFAULT_RFP_LIST_LIMIT);
   const limit = Math.min(requestedLimit || DEFAULT_RFP_LIST_LIMIT, MAX_RFP_LIST_LIMIT);
-  const page = rfps.slice(offset, offset + limit);
+  return { offset, limit };
+}
+
+function toPaginatedRfps(page: Rfp[], total: number, offset: number, limit: number): PaginatedRfps {
   const nextOffset = offset + page.length;
-  const hasMore = nextOffset < rfps.length;
+  const hasMore = nextOffset < total;
 
   return {
     rfps: page,
-    total: rfps.length,
+    total,
     offset,
     limit,
     has_more: hasMore,
     next_offset: hasMore ? nextOffset : null,
   };
+}
+
+/**
+ * Search + paginate in the database (one round trip, only the requested page is transferred).
+ * Falls back to the in-memory filter when the DB path can't answer exactly: a `*` in the term, an older
+ * schema, or a multi-word term with no single-column match (the in-memory search also matches across
+ * fields, e.g. "Active TBD").
+ */
+export async function listRfpsForChatgpt(search: string | null | undefined, options: RfpListOptions = {}): Promise<PaginatedRfps> {
+  const { offset, limit } = resolveRfpListWindow(options);
+  const page = await listRfpPage({ search, offset, limit });
+  const crossFieldPossible = /\s/.test(normalizeSearch(search ?? ""));
+
+  if (page && !(page.total === 0 && crossFieldPossible)) {
+    return toPaginatedRfps(page.rfps, page.total, offset, limit);
+  }
+
+  return paginateRfpsForChatgpt(filterRfpsForChatgpt(await listRfps(), search), { offset, limit });
+}
+
+export function paginateRfpsForChatgpt(rfps: Rfp[], options: RfpListOptions = {}): PaginatedRfps {
+  const { offset, limit } = resolveRfpListWindow(options);
+  return toPaginatedRfps(rfps.slice(offset, offset + limit), rfps.length, offset, limit);
 }
