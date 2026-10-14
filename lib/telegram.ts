@@ -10,6 +10,7 @@ export type TelegramUser = {
 
 export type TelegramMessageEntity = {
   type: string;
+  /** UTF-16 code units, so it indexes JS strings directly. */
   offset: number;
   length: number;
 };
@@ -49,10 +50,11 @@ async function callTelegram<T>(method: string, payload: Record<string, unknown>)
     body: JSON.stringify(payload),
   });
 
-  const body = (await response.json()) as { ok: boolean; result?: T; description?: string };
+  // Gateway errors come back as HTML, so don't let a parse failure hide the real status.
+  const body = (await response.json().catch(() => ({ ok: false }))) as { ok: boolean; result?: T; description?: string };
 
   if (!response.ok || !body.ok) {
-    throw new Error(`Telegram ${method} failed: ${body.description ?? response.statusText}`);
+    throw new Error(`Telegram ${method} failed (${response.status}): ${body.description ?? response.statusText}`);
   }
 
   return body.result as T;
@@ -60,10 +62,25 @@ async function callTelegram<T>(method: string, payload: Record<string, unknown>)
 
 let cachedBotUser: Promise<TelegramUser> | null = null;
 
-/** Identity of this bot, cached for the lifetime of the (warm) function instance. */
+/** Identity of this bot, cached for the lifetime of the (warm) function instance. Failures are not cached. */
 export function getBotUser(): Promise<TelegramUser> {
-  cachedBotUser ??= callTelegram<TelegramUser>("getMe", {});
+  if (!cachedBotUser) {
+    const pending = callTelegram<TelegramUser>("getMe", {});
+    cachedBotUser = pending;
+    pending.catch(() => {
+      if (cachedBotUser === pending) cachedBotUser = null;
+    });
+  }
   return cachedBotUser;
+}
+
+type ChatMember = { status: "creator" | "administrator" | "member" | "restricted" | "left" | "kicked"; is_member?: boolean };
+
+/** True when the user currently belongs to the chat (restricted members count only while still in it). */
+export async function isChatMember(chatId: number, userId: number): Promise<boolean> {
+  const member = await callTelegram<ChatMember>("getChatMember", { chat_id: chatId, user_id: userId });
+  if (member.status === "restricted") return member.is_member === true;
+  return member.status === "creator" || member.status === "administrator" || member.status === "member";
 }
 
 export function sendChatTyping(chatId: number): Promise<true> {

@@ -1,15 +1,22 @@
 import { after, NextResponse } from "next/server";
-import { answerQuestion, engagementFor } from "@/lib/telegram-bot";
-import { getBotUser, sendChatTyping, sendTelegramMessage, type TelegramUpdate } from "@/lib/telegram";
+import { handleTelegramMessage } from "@/lib/telegram-bot";
+import type { TelegramUpdate } from "@/lib/telegram";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// Vercel's ceiling with Fluid Compute on every plan; the answer budget leaves time to send a reply before it.
+export const maxDuration = 300;
+const ANSWER_BUDGET_MS = 260_000;
 
 /** Telegram retries until it sees a 200, so always ack - even for updates we ignore. */
 export async function POST(request: Request) {
+  // Fail closed: without a secret anyone could post forged updates and read tender data.
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (expectedSecret && request.headers.get("x-telegram-bot-api-secret-token") !== expectedSecret) {
+  if (!expectedSecret) {
+    console.error("Telegram webhook rejected: TELEGRAM_WEBHOOK_SECRET is not set.");
+    return NextResponse.json({ error: "Missing TELEGRAM_WEBHOOK_SECRET environment variable." }, { status: 500 });
+  }
+  if (request.headers.get("x-telegram-bot-api-secret-token") !== expectedSecret) {
     return NextResponse.json({ error: "Invalid webhook secret." }, { status: 403 });
   }
 
@@ -25,24 +32,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  after(async () => {
-    try {
-      const botUser = await getBotUser();
-      const engagement = engagementFor(message, { id: botUser.id, username: botUser.username ?? "" });
-      if (!engagement.respond) return;
-
-      await sendChatTyping(message.chat.id).catch(() => undefined);
-      const answer = await answerQuestion(message, engagement.question);
-      await sendTelegramMessage(message.chat.id, message.message_id, answer);
-    } catch (error) {
-      console.error("Telegram bot failed to answer:", error);
-      await sendTelegramMessage(
-        message.chat.id,
-        message.message_id,
-        "Sorry, something went wrong on my side. Please try again in a moment.",
-      ).catch(() => undefined);
-    }
-  });
+  after(() =>
+    handleTelegramMessage(message, { deadlineMs: ANSWER_BUDGET_MS }).catch((error: unknown) => {
+      console.error("Telegram bot failed to handle update:", update.update_id, error);
+    }),
+  );
 
   return NextResponse.json({ ok: true });
 }

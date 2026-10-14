@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { engagementFor, senderDisplayName } from "@/lib/telegram-bot";
+import { chatAccess, engagementFor, parseAllowedChatIds, senderDisplayName } from "@/lib/telegram-bot";
 import { splitTelegramMessage } from "@/lib/telegram";
 import type { TelegramMessage } from "@/lib/telegram";
 
@@ -19,7 +19,7 @@ describe("engagementFor", () => {
   it("responds when the bot is @mentioned and strips the mention", () => {
     const result = engagementFor(groupMessage({ text: "@rfpmanager_bot what's the status of Bathurst?" }), bot);
 
-    expect(result).toEqual({ respond: true, question: "what's the status of Bathurst?" });
+    expect(result).toEqual({ respond: true, kind: "question", question: "what's the status of Bathurst?" });
   });
 
   it("responds to a reply to the bot's own message", () => {
@@ -31,7 +31,7 @@ describe("engagementFor", () => {
       bot,
     );
 
-    expect(result).toEqual({ respond: true, question: "and the closing date?" });
+    expect(result).toEqual({ respond: true, kind: "question", question: "and the closing date?" });
   });
 
   it("ignores ordinary group traffic", () => {
@@ -45,7 +45,7 @@ describe("engagementFor", () => {
   it("answers everything in private chats", () => {
     const result = engagementFor(groupMessage({ chat: { id: 7, type: "private" } }), bot);
 
-    expect(result).toEqual({ respond: true, question: "hello" });
+    expect(result).toEqual({ respond: true, kind: "question", question: "hello" });
   });
 
   it("ignores messages without text", () => {
@@ -55,8 +55,113 @@ describe("engagementFor", () => {
   it("prompts when the mention carries no question", () => {
     const result = engagementFor(groupMessage({ text: "@rfpmanager_bot" }), bot);
 
-    expect(result.respond).toBe(true);
-    if (result.respond) expect(result.question.length).toBeGreaterThan(0);
+    expect(result).toEqual({ respond: true, kind: "question", question: "Hi! What would you like to know about our tenders?" });
+  });
+});
+
+describe("engagementFor with Telegram entities", () => {
+  it("responds to an exact mention entity and strips it from the middle of the question", () => {
+    const text = "hey @RFPmanager_bot when does Bathurst close?";
+    const result = engagementFor(groupMessage({ text, entities: [{ type: "mention", offset: 4, length: 15 }] }), bot);
+
+    expect(result).toEqual({ respond: true, kind: "question", question: "hey when does Bathurst close?" });
+  });
+
+  it("ignores a mention of a different bot whose name starts with ours", () => {
+    const text = "@rfpmanager_bot_old ping";
+    const result = engagementFor(groupMessage({ text, entities: [{ type: "mention", offset: 0, length: 19 }] }), bot);
+
+    expect(result).toEqual({ respond: false });
+  });
+
+  it("ignores the bot name inside an email address", () => {
+    const text = "write to sales@rfpmanager_bot.com please";
+    expect(engagementFor(groupMessage({ text, entities: [{ type: "email", offset: 9, length: 24 }] }), bot)).toEqual({
+      respond: false,
+    });
+    expect(engagementFor(groupMessage({ text }), bot)).toEqual({ respond: false });
+  });
+
+  it("answers /ask in a group and strips the command", () => {
+    const result = engagementFor(
+      groupMessage({ text: "/ask@rfpmanager_bot what is due this week?", entities: [{ type: "bot_command", offset: 0, length: 19 }] }),
+      bot,
+    );
+
+    expect(result).toEqual({ respond: true, kind: "question", question: "what is due this week?" });
+  });
+
+  it("ignores commands addressed to another bot", () => {
+    const result = engagementFor(
+      groupMessage({ text: "/ask@other_bot what is due?", entities: [{ type: "bot_command", offset: 0, length: 14 }] }),
+      bot,
+    );
+
+    expect(result).toEqual({ respond: false });
+  });
+
+  it("answers /start in a private chat with the help text", () => {
+    const result = engagementFor(
+      groupMessage({ chat: { id: 7, type: "private" }, text: "/start", entities: [{ type: "bot_command", offset: 0, length: 6 }] }),
+      bot,
+    );
+
+    expect(result).toEqual({ respond: true, kind: "help" });
+  });
+
+  it("turns /summary into a save-summary request for the named tender", () => {
+    const result = engagementFor(
+      groupMessage({ text: "/summary Bathurst water", entities: [{ type: "bot_command", offset: 0, length: 8 }] }),
+      bot,
+    );
+
+    expect(result).toEqual({
+      respond: true,
+      kind: "question",
+      question: 'Write a summary for the tender "Bathurst water" from its converted documents and save it.',
+    });
+  });
+
+  it("leaves unknown bare commands in a group to other bots", () => {
+    const unknown = (text: string, length: number) =>
+      engagementFor(groupMessage({ text, entities: [{ type: "bot_command", offset: 0, length }] }), bot);
+
+    expect(unknown("/poll lunch?", 5)).toEqual({ respond: false });
+    expect(unknown("/constructor", 12)).toEqual({ respond: false });
+    expect(unknown("/poll@rfpmanager_bot lunch?", 20)).toEqual({ respond: true, kind: "help" });
+  });
+});
+
+describe("parseAllowedChatIds", () => {
+  it("reads comma and space separated ids and drops junk", () => {
+    expect([...parseAllowedChatIds("-1001234567890, -42 abc,, 0")]).toEqual([-1001234567890, -42]);
+  });
+});
+
+describe("chatAccess", () => {
+  const allowed = new Set([-100]);
+  const memberOf = (groupId: number, memberId: number) => async (chatId: number, userId: number) =>
+    chatId === groupId && userId === memberId;
+
+  it("allows listed groups and refuses others", async () => {
+    expect(await chatAccess(groupMessage(), allowed)).toBe("allowed");
+    expect(await chatAccess(groupMessage({ chat: { id: -555, type: "group" } }), allowed)).toBe("chat_not_allowed");
+  });
+
+  it("allows private chats only with members of an allowed group", async () => {
+    const dm = groupMessage({ chat: { id: 7, type: "private" } });
+
+    expect(await chatAccess(dm, allowed, memberOf(-100, 7))).toBe("allowed");
+    expect(await chatAccess(dm, allowed, memberOf(-100, 8))).toBe("not_a_member");
+  });
+
+  it("treats a failed membership lookup as not a member", async () => {
+    const dm = groupMessage({ chat: { id: 7, type: "private" } });
+    const failing = async () => {
+      throw new Error("Telegram getChatMember failed (400)");
+    };
+
+    expect(await chatAccess(dm, allowed, failing)).toBe("not_a_member");
   });
 });
 

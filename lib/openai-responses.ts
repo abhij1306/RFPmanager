@@ -49,7 +49,17 @@ export function getOpenAiModel(): string {
   return process.env.OPENAI_MODEL?.trim() || "gpt-6-luna";
 }
 
-async function createResponse(payload: Record<string, unknown>): Promise<ResponsesApiReply> {
+export class OpenAiRequestError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+  ) {
+    super(`OpenAI request failed (${status}): ${message}`);
+    this.name = "OpenAiRequestError";
+  }
+}
+
+async function createResponse(payload: Record<string, unknown>, signal?: AbortSignal): Promise<ResponsesApiReply> {
   const response = await fetch(OPENAI_RESPONSES_URL, {
     method: "POST",
     headers: {
@@ -57,15 +67,21 @@ async function createResponse(payload: Record<string, unknown>): Promise<Respons
       authorization: `Bearer ${getOpenAiApiKey()}`,
     },
     body: JSON.stringify(payload),
+    signal,
   });
 
   const body = (await response.json().catch(() => ({}))) as ResponsesApiReply;
 
   if (!response.ok) {
-    throw new Error(`OpenAI request failed (${response.status}): ${body.error?.message ?? response.statusText}`);
+    throw new OpenAiRequestError(response.status, body.error?.message ?? response.statusText);
   }
 
   return body;
+}
+
+/** A 400 that names the web search tool: this model doesn't support it. Other 400s are real failures. */
+function isWebSearchRejection(error: unknown): boolean {
+  return error instanceof OpenAiRequestError && error.status === 400 && /web_search/i.test(error.message);
 }
 
 function extractOutputText(output: ResponseOutputItem[] | undefined): string {
@@ -82,53 +98,37 @@ function extractOutputText(output: ResponseOutputItem[] | undefined): string {
 
 /**
  * Run one brainstorm turn. Function tools are executed locally; the built-in web_search_preview tool is
- * executed by OpenAI. If the model rejects web search (unknown tool for that model), retry without it.
+ * executed by OpenAI. If the model rejects web search, only that request is re-sent without it - tools that
+ * already ran (including writes) are never repeated. `signal` aborts the turn, e.g. at the function's deadline.
  */
 export async function runResponsesTurn({
   instructions,
   input,
   tools,
   onFunctionCall,
+  signal,
 }: {
   instructions: string;
   input: string;
   tools: ResponseTool[];
   onFunctionCall: FunctionCallHandler;
-}): Promise<string> {
-  const withWebSearch = tools.some((tool) => tool.type === "web_search_preview");
-
-  try {
-    return await runLoop({ instructions, input, tools, onFunctionCall });
-  } catch (error) {
-    // Unknown-tool rejections (older models without web search) come back as 400s: retry without it.
-    if (withWebSearch && error instanceof Error && /\(400\)/.test(error.message)) {
-      const withoutWebSearch = tools.filter((tool) => tool.type !== "web_search_preview");
-      return runLoop({ instructions, input, tools: withoutWebSearch, onFunctionCall });
-    }
-    throw error;
-  }
-}
-
-async function runLoop({
-  instructions,
-  input,
-  tools,
-  onFunctionCall,
-}: {
-  instructions: string;
-  input: string;
-  tools: ResponseTool[];
-  onFunctionCall: FunctionCallHandler;
+  signal?: AbortSignal;
 }): Promise<string> {
   const conversation: unknown[] = [{ role: "user", content: input }];
+  let activeTools = tools;
+
+  const request = async () => {
+    try {
+      return await createResponse({ model: getOpenAiModel(), instructions, input: conversation, tools: activeTools }, signal);
+    } catch (error) {
+      if (!isWebSearchRejection(error) || !activeTools.some((tool) => tool.type === "web_search_preview")) throw error;
+      activeTools = activeTools.filter((tool) => tool.type !== "web_search_preview");
+      return createResponse({ model: getOpenAiModel(), instructions, input: conversation, tools: activeTools }, signal);
+    }
+  };
 
   for (let round = 0; round < MAX_TOOL_ROUNDS; round += 1) {
-    const reply = await createResponse({
-      model: getOpenAiModel(),
-      instructions,
-      input: conversation,
-      tools,
-    });
+    const reply = await request();
 
     const functionCalls = (reply.output ?? []).filter(
       (item): item is FunctionCallItem => item.type === "function_call",
@@ -144,6 +144,8 @@ async function runLoop({
     conversation.push(...(reply.output ?? []));
 
     for (const call of functionCalls) {
+      signal?.throwIfAborted();
+
       let parsedArgs: Record<string, unknown> = {};
       try {
         parsedArgs = JSON.parse(call.arguments || "{}") as Record<string, unknown>;
