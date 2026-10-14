@@ -1,5 +1,5 @@
 import { after, NextResponse } from "next/server";
-import { handleTelegramMessage } from "@/lib/telegram-bot";
+import { handleTelegramCallback, handleTelegramMessage } from "@/lib/telegram-bot";
 import type { TelegramUpdate } from "@/lib/telegram";
 
 export const runtime = "nodejs";
@@ -27,13 +27,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
-  const message = update.message;
-  if (!message) {
+  // Button taps need the webhook's allowed_updates to include "callback_query".
+  const { message, callback_query: callbackQuery } = update;
+  const handle = message
+    ? () => handleTelegramMessage(message, { deadlineMs: ANSWER_BUDGET_MS })
+    : callbackQuery
+      ? () => handleTelegramCallback(callbackQuery, { deadlineMs: ANSWER_BUDGET_MS })
+      : null;
+  if (!handle) {
     return NextResponse.json({ ok: true });
   }
 
   after(() =>
-    handleTelegramMessage(message, { deadlineMs: ANSWER_BUDGET_MS }).catch((error: unknown) => {
+    handle().catch((error: unknown) => {
       console.error("Telegram bot failed to handle update:", update.update_id, error);
     }),
   );
