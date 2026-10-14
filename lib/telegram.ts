@@ -87,15 +87,18 @@ export function sendChatTyping(chatId: number): Promise<true> {
   return callTelegram<true>("sendChatAction", { chat_id: chatId, action: "typing" });
 }
 
-/** Telegram hard-caps messages at 4096 characters; send long answers in order. */
-export async function sendTelegramMessage(chatId: number, replyToMessageId: number, text: string): Promise<void> {
+/** Telegram hard-caps messages at 4096 characters; send long answers in order. Resolves to the sent message ids. */
+export async function sendTelegramMessage(chatId: number, replyToMessageId: number, text: string): Promise<number[]> {
+  const sentIds: number[] = [];
   for (const chunk of splitTelegramMessage(text)) {
-    await callTelegram("sendMessage", {
+    const sent = await callTelegram<{ message_id: number }>("sendMessage", {
       chat_id: chatId,
       text: chunk,
       reply_parameters: { message_id: replyToMessageId, allow_sending_without_reply: true },
     });
+    sentIds.push(sent.message_id);
   }
+  return sentIds;
 }
 
 /** Split on paragraph/line/word boundaries so long answers stay under the 4096 character cap. */

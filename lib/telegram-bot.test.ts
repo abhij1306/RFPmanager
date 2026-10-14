@@ -122,6 +122,12 @@ describe("engagementFor with Telegram entities", () => {
     });
   });
 
+  it("recognises /clear in a group", () => {
+    const result = engagementFor(groupMessage({ text: "/clear", entities: [{ type: "bot_command", offset: 0, length: 6 }] }), bot);
+
+    expect(result).toEqual({ respond: true, kind: "clear" });
+  });
+
   it("leaves unknown bare commands in a group to other bots", () => {
     const unknown = (text: string, length: number) =>
       engagementFor(groupMessage({ text, entities: [{ type: "bot_command", offset: 0, length }] }), bot);

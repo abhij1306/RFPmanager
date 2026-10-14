@@ -32,6 +32,9 @@ type ResponsesApiReply = {
   error?: { message?: string };
 };
 
+/** Earlier conversation turns, sent before the new input. */
+export type HistoryItem = { role: "user" | "assistant"; content: string };
+
 export type FunctionCallHandler = (name: string, args: Record<string, unknown>) => Promise<string>;
 
 const OPENAI_RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -107,14 +110,16 @@ export async function runResponsesTurn({
   tools,
   onFunctionCall,
   signal,
+  history = [],
 }: {
   instructions: string;
   input: string;
   tools: ResponseTool[];
   onFunctionCall: FunctionCallHandler;
   signal?: AbortSignal;
+  history?: HistoryItem[];
 }): Promise<string> {
-  const conversation: unknown[] = [{ role: "user", content: input }];
+  const conversation: unknown[] = [...history, { role: "user", content: input }];
   let activeTools = tools;
 
   const request = async () => {
