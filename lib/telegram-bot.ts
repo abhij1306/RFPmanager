@@ -1,9 +1,13 @@
 import { z } from "zod/v4";
+import { readCompanyProfile } from "@/lib/company-profile";
 import { getDocumentExcerptForChatgpt, listDocumentSummariesForChatgpt, MAX_DOCUMENT_LIST_LIMIT } from "@/lib/chatgpt-documents";
 import { listRfpDigest } from "@/lib/rfp-queries";
 import { getRfp, updateRfpSummary } from "@/lib/rfps";
-import { runResponsesTurn, type ResponseTool } from "@/lib/openai-responses";
+import { truncate } from "@/lib/display";
+import { runResponsesTurn, type HistoryItem, type ResponseTool } from "@/lib/openai-responses";
+import { loadMemory, memoryToInput, rememberExchange, supabaseExchangeStore } from "@/lib/telegram-memory";
 import {
+  displayName,
   getBotUser,
   isChatMember,
   sendChatTyping,
@@ -31,7 +35,8 @@ export type BotIdentity = {
 export type Engagement =
   | { respond: false }
   | { respond: true; kind: "question"; question: string }
-  | { respond: true; kind: "help" };
+  | { respond: true; kind: "help" }
+  | { respond: true; kind: "clear" };
 
 /** Shown for /help and /start: answered locally, no model call. */
 export const HELP_TEXT = [
@@ -42,22 +47,32 @@ export const HELP_TEXT = [
   "/tenders - all tenders with status and closing dates",
   "/due [days] - tenders closing soon (default 14 days)",
   "/summary <tender> - write and save a summary from its documents",
+  "/clear - make me forget our conversation in this chat",
   "/help - this message",
 ].join("\n");
 
-/** Each command turns its argument text into the question the model answers. */
-const COMMANDS: Record<string, (rest: string) => string> = {
-  ask: (rest) => rest || EMPTY_QUESTION,
+const HELP: Engagement = { respond: true, kind: "help" };
+
+/** Every command the bot answers: each turns its argument text into what the bot does. */
+const COMMANDS: Record<string, (rest: string) => Engagement> = {
+  ask: (rest) => asQuestion(rest),
   tenders: (rest) =>
-    `List all our tenders with bid status, pipeline stage and closing date, soonest closing first.${rest ? ` Focus on: ${rest}` : ""}`,
+    asQuestion(`List all our tenders with bid status, pipeline stage and closing date, soonest closing first.${rest ? ` Focus on: ${rest}` : ""}`),
   due: (rest) => {
     const days = Number.parseInt(rest, 10) > 0 ? Number.parseInt(rest, 10) : 14;
-    return `Today is ${new Date().toISOString().slice(0, 10)}. Which tenders close in the next ${days} days? Give each one's closing date and status.`;
+    return asQuestion(
+      `Today is ${new Date().toISOString().slice(0, 10)}. Which tenders close in the next ${days} days? Give each one's closing date and status.`,
+    );
   },
   summary: (rest) =>
-    rest
-      ? `Write a summary for the tender "${rest}" from its converted documents and save it.`
-      : "I want a tender summary written and saved but did not say which tender. Ask me which one, listing the candidates.",
+    asQuestion(
+      rest
+        ? `Write a summary for the tender "${rest}" from its converted documents and save it.`
+        : "I want a tender summary written and saved but did not say which tender. Ask me which one, listing the candidates.",
+    ),
+  clear: () => ({ respond: true, kind: "clear" }),
+  help: () => HELP,
+  start: () => HELP,
 };
 
 /**
@@ -75,13 +90,11 @@ export function engagementFor(message: TelegramMessage, bot: BotIdentity): Engag
   const isPrivate = message.chat.type === "private";
 
   if (command) {
-    if (command.name === "help" || command.name === "start") return { respond: true, kind: "help" };
     // hasOwn so /constructor or /tostring can't reach Object.prototype.
-    const toQuestion = Object.hasOwn(COMMANDS, command.name) ? COMMANDS[command.name] : undefined;
-    const rest = removeRanges(text, [command, ...ownMentions]);
-    if (toQuestion) return asQuestion(toQuestion(rest));
+    const toEngagement = Object.hasOwn(COMMANDS, command.name) ? COMMANDS[command.name] : undefined;
+    if (toEngagement) return toEngagement(removeRanges(text, [command, ...ownMentions]));
     // Unknown commands: ours when addressed to us or in a DM; in a group a bare /cmd may be for another bot.
-    if (command.addressedToUs || isPrivate) return { respond: true, kind: "help" };
+    if (command.addressedToUs || isPrivate) return HELP;
     return { respond: false };
   }
 
@@ -209,14 +222,7 @@ export function accessDeniedReply(
 }
 
 export function senderDisplayName(message: TelegramMessage): string {
-  const from = message.from;
-  if (!from) return "there";
-  return [from.first_name, from.last_name].filter(Boolean).join(" ").trim() || from.username || "there";
-}
-
-function truncate(value: string | null | undefined, limit: number): string | null {
-  if (!value) return null;
-  return value.length > limit ? `${value.slice(0, limit)}...` : value;
+  return displayName(message.from, "there");
 }
 
 const tools: ResponseTool[] = [
@@ -290,6 +296,19 @@ const tools: ResponseTool[] = [
       additionalProperties: false,
     },
   },
+  {
+    type: "function",
+    name: "read_company_profile",
+    description:
+      "Read HTC Global's own company profile: overview and snapshot (ABN, address, certifications), services, delivery model, implementation methodology, timeline, responsibility matrix, inclusions, case studies, client references, insurance. Only call it when the question is about HTC Global itself or about how HTC fits a tender. Call without section to list the sections, then with a section title (or number) to read it.",
+    parameters: {
+      type: "object",
+      properties: {
+        section: { type: "string", description: 'Section title or number, e.g. "Case Studies" or "10". Omit to list sections.' },
+      },
+      additionalProperties: false,
+    },
+  },
   { type: "web_search_preview" },
 ];
 
@@ -312,6 +331,7 @@ const toolCallSchema = z.discriminatedUnion("name", [
       limit: z.coerce.number().int().min(1).max(DOCUMENT_READ_LIMIT).catch(DOCUMENT_READ_LIMIT).optional(),
     }),
   }),
+  z.object({ name: z.literal("read_company_profile"), args: z.object({ section: z.string().optional() }) }),
   z.object({
     name: z.literal("save_rfp_summary"),
     args: z.object({ rfp_id: z.string().min(1), summary: z.string().trim().min(1, "Summary text is empty; nothing saved.") }),
@@ -356,12 +376,12 @@ async function handleToolCall(name: string, rawArgs: Record<string, unknown>): P
         closing_date: rfp.closing_date,
         closing_date_text: rfp.closing_date_text,
         tender_link: rfp.tender_link,
-        description: truncate(rfp.description, 2000),
+        description: rfp.description ? truncate(rfp.description, 2000) : null,
         contact_person: rfp.contact_person,
         contact_email: rfp.contact_email,
         contact_phone: rfp.contact_phone,
-        notes: truncate(rfp.notes, 2000),
-        summary: truncate(rfp.summary, 6000),
+        notes: rfp.notes ? truncate(rfp.notes, 2000) : null,
+        summary: rfp.summary ? truncate(rfp.summary, 6000) : null,
         summary_generated_at: rfp.summary_generated_at,
       });
     }
@@ -405,6 +425,9 @@ async function handleToolCall(name: string, rawArgs: Record<string, unknown>): P
       });
     }
 
+    case "read_company_profile":
+      return readCompanyProfile(call.args.section);
+
     case "save_rfp_summary": {
       const updated = await updateRfpSummary(call.args.rfp_id, call.args.summary);
       return JSON.stringify({ saved: true, rfp: updated.client_name, saved_at: updated.summary_generated_at });
@@ -425,17 +448,24 @@ function buildInstructions(askerName: string): string {
     "Use the tools to look up RFPs and read documents before answering factual questions about tenders. Never invent tender details, dates, or requirements.",
     "Web search is unrestricted: use it for anything a member asks about - tender context, agencies, market info, tech, or general knowledge. General questions that need no RFP data are welcome; just answer them (search first when facts could be stale).",
     "When someone asks you to write or save a summary for an RFP, draft it from the converted documents and save it with save_rfp_summary right away - no confirmation step. Then confirm it is saved and paste the summary.",
+    "HTC Global is our company. For questions about HTC itself (capabilities, case studies, references, certifications, insurance, methodology, ABN, address) or whether HTC fits a tender, read the relevant section with read_company_profile - only the sections you need, and not for questions that don't involve HTC. If you quote insurance or other dated details, say when they expire and flag any that have already expired.",
+    "Earlier messages from this conversation may come before the new question. Use them to resolve follow-ups like 'that tender' or 'the second one', but answer only the newest question.",
     "You are read-only apart from saving summaries: you cannot create, edit, or delete RFPs, documents, or drafts. Decline such requests briefly.",
     "If a question is ambiguous about which RFP it means, ask a short clarifying question naming the candidates.",
   ].join("\n");
 }
 
 /** Answer one question that was already confirmed as addressed to the bot. */
-export async function answerQuestion(message: TelegramMessage, question: string, signal?: AbortSignal): Promise<string> {
+export async function answerQuestion(
+  message: TelegramMessage,
+  question: string,
+  { history = [], signal }: { history?: HistoryItem[]; signal?: AbortSignal } = {},
+): Promise<string> {
   const asker = senderDisplayName(message);
 
   return runResponsesTurn({
     instructions: buildInstructions(asker),
+    history,
     input: `${asker} asks: ${question}`,
     tools,
     onFunctionCall: handleToolCall,
@@ -448,11 +478,22 @@ const TYPING_REFRESH_MS = 4500;
 /**
  * Handle one incoming message end to end. Nothing is sent unless the message is addressed to the bot, and
  * the apology is only sent when producing the answer failed - never after a partly delivered answer.
+ * Answered questions are remembered so replies and follow-ups have context.
  */
 export async function handleTelegramMessage(message: TelegramMessage, { deadlineMs }: { deadlineMs: number }): Promise<void> {
   const botUser = await getBotUser();
   const engagement = engagementFor(message, { id: botUser.id, username: botUser.username ?? "" });
   if (!engagement.respond) return;
+
+  // Memory is best effort (a missing table or failed query means answering without it), and it doesn't
+  // depend on the access check, so start loading it now.
+  const memory =
+    engagement.kind === "question"
+      ? loadMemory(message, botUser.id).catch((error: unknown) => {
+          console.warn("Telegram bot answering without memory:", error);
+          return undefined;
+        })
+      : undefined;
 
   const allowedChatIds = parseAllowedChatIds(process.env.TELEGRAM_ALLOWED_CHAT_IDS);
   const access = await chatAccess(message, allowedChatIds);
@@ -467,14 +508,32 @@ export async function handleTelegramMessage(message: TelegramMessage, { deadline
     return;
   }
 
+  if (engagement.kind === "clear") {
+    const reply = await supabaseExchangeStore.clearChat(message.chat.id).then(
+      (count) => `Done - I've forgotten ${count} earlier exchange${count === 1 ? "" : "s"} in this chat. We're starting fresh.`,
+      (error: unknown) => {
+        console.error("Telegram bot could not clear memory:", error);
+        return "Sorry, I couldn't clear my memory just now. Please try again in a moment.";
+      },
+    );
+    await sendTelegramMessage(message.chat.id, message.message_id, reply);
+    return;
+  }
+
   // Telegram clears "typing" after ~5s, so keep it alive while the model works.
   const showTyping = () => void sendChatTyping(message.chat.id).catch(() => undefined);
   showTyping();
   const typing = setInterval(showTyping, TYPING_REFRESH_MS);
 
   let reply: string;
+  let answered = false;
   try {
-    reply = await answerQuestion(message, engagement.question, AbortSignal.timeout(deadlineMs));
+    const recalled = await memory;
+    reply = await answerQuestion(message, engagement.question, {
+      history: recalled ? memoryToInput(recalled) : [],
+      signal: AbortSignal.timeout(deadlineMs),
+    });
+    answered = true;
   } catch (error) {
     console.error("Telegram bot failed to answer:", error);
     reply =
@@ -485,5 +544,10 @@ export async function handleTelegramMessage(message: TelegramMessage, { deadline
     clearInterval(typing);
   }
 
-  await sendTelegramMessage(message.chat.id, message.message_id, reply);
+  const botMessageIds = await sendTelegramMessage(message.chat.id, message.message_id, reply);
+  if (!answered) return;
+
+  await rememberExchange({ message, botId: botUser.id, question: engagement.question, answer: reply, botMessageIds }).catch(
+    (error: unknown) => console.warn("Telegram bot could not remember this exchange:", error),
+  );
 }

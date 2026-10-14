@@ -64,6 +64,28 @@ describe("runResponsesTurn", () => {
     expect(sent[2].input).toHaveLength(3);
   });
 
+  it("sends earlier conversation turns before the new question", async () => {
+    const sent = fakeOpenAi([[200, answer("Bathurst closes on 20 October.")]]);
+
+    const result = await runResponsesTurn({
+      instructions: "test",
+      input: "Priya asks: and its closing date?",
+      history: [
+        { role: "user", content: "Priya asks: which tender is about water?" },
+        { role: "assistant", content: "Bathurst." },
+      ],
+      tools,
+      onFunctionCall: async () => "unused",
+    });
+
+    expect(result).toBe("Bathurst closes on 20 October.");
+    expect(sent[0].input).toEqual([
+      { role: "user", content: "Priya asks: which tender is about water?" },
+      { role: "assistant", content: "Bathurst." },
+      { role: "user", content: "Priya asks: and its closing date?" },
+    ]);
+  });
+
   it("fails on an unrelated 400 instead of restarting the turn", async () => {
     fakeOpenAi([
       [200, { output: [saveCall] }],

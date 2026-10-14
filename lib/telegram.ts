@@ -1,5 +1,7 @@
 /** Minimal Telegram Bot API client: only what the group brainstorm bot needs. */
 
+import { memoizeAsync } from "@/lib/memoize-async";
+
 export type TelegramUser = {
   id: number;
   is_bot: boolean;
@@ -60,18 +62,13 @@ async function callTelegram<T>(method: string, payload: Record<string, unknown>)
   return body.result as T;
 }
 
-let cachedBotUser: Promise<TelegramUser> | null = null;
-
 /** Identity of this bot, cached for the lifetime of the (warm) function instance. Failures are not cached. */
-export function getBotUser(): Promise<TelegramUser> {
-  if (!cachedBotUser) {
-    const pending = callTelegram<TelegramUser>("getMe", {});
-    cachedBotUser = pending;
-    pending.catch(() => {
-      if (cachedBotUser === pending) cachedBotUser = null;
-    });
-  }
-  return cachedBotUser;
+export const getBotUser = memoizeAsync(() => callTelegram<TelegramUser>("getMe", {}));
+
+/** "First Last", else the @username, else the fallback. */
+export function displayName(user: TelegramUser | undefined, fallback: string): string {
+  if (!user) return fallback;
+  return [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.username || fallback;
 }
 
 type ChatMember = { status: "creator" | "administrator" | "member" | "restricted" | "left" | "kicked"; is_member?: boolean };
@@ -87,15 +84,18 @@ export function sendChatTyping(chatId: number): Promise<true> {
   return callTelegram<true>("sendChatAction", { chat_id: chatId, action: "typing" });
 }
 
-/** Telegram hard-caps messages at 4096 characters; send long answers in order. */
-export async function sendTelegramMessage(chatId: number, replyToMessageId: number, text: string): Promise<void> {
+/** Telegram hard-caps messages at 4096 characters; send long answers in order. Resolves to the sent message ids. */
+export async function sendTelegramMessage(chatId: number, replyToMessageId: number, text: string): Promise<number[]> {
+  const sentIds: number[] = [];
   for (const chunk of splitTelegramMessage(text)) {
-    await callTelegram("sendMessage", {
+    const sent = await callTelegram<{ message_id: number }>("sendMessage", {
       chat_id: chatId,
       text: chunk,
       reply_parameters: { message_id: replyToMessageId, allow_sending_without_reply: true },
     });
+    sentIds.push(sent.message_id);
   }
+  return sentIds;
 }
 
 /** Split on paragraph/line/word boundaries so long answers stay under the 4096 character cap. */
