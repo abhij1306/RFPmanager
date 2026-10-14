@@ -1,6 +1,7 @@
 /** Minimal Telegram Bot API client: only what the group brainstorm bot needs. */
 
 import { memoizeAsync } from "@/lib/memoize-async";
+import { markdownToTelegramHtml } from "@/lib/telegram-format";
 
 export type TelegramUser = {
   id: number;
@@ -30,12 +31,36 @@ export type TelegramMessage = {
   entities?: TelegramMessageEntity[];
   caption_entities?: TelegramMessageEntity[];
   reply_to_message?: TelegramMessage;
+  reply_markup?: { inline_keyboard: InlineKeyboard };
+};
+
+export type InlineButton = { text: string; url: string } | { text: string; callback_data: string };
+export type InlineKeyboard = InlineButton[][];
+
+/** A tap on an inline button. `message` is the bot message carrying the button (absent if it is too old). */
+export type TelegramCallbackQuery = {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  data?: string;
 };
 
 export type TelegramUpdate = {
   update_id: number;
   message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
 };
+
+export class TelegramApiError extends Error {
+  constructor(
+    readonly method: string,
+    readonly status: number,
+    readonly description: string,
+  ) {
+    super(`Telegram ${method} failed (${status}): ${description}`);
+    this.name = "TelegramApiError";
+  }
+}
 
 function getBotToken(): string {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -56,7 +81,7 @@ async function callTelegram<T>(method: string, payload: Record<string, unknown>)
   const body = (await response.json().catch(() => ({ ok: false }))) as { ok: boolean; result?: T; description?: string };
 
   if (!response.ok || !body.ok) {
-    throw new Error(`Telegram ${method} failed (${response.status}): ${body.description ?? response.statusText}`);
+    throw new TelegramApiError(method, response.status, body.description ?? response.statusText);
   }
 
   return body.result as T;
@@ -80,26 +105,69 @@ export async function isChatMember(chatId: number, userId: number): Promise<bool
   return member.status === "creator" || member.status === "administrator" || member.status === "member";
 }
 
-export function sendChatTyping(chatId: number): Promise<true> {
-  return callTelegram<true>("sendChatAction", { chat_id: chatId, action: "typing" });
+/** One outgoing message body: plain text, or light Markdown sent as Telegram HTML. */
+export type OutgoingText = { text: string; markdown?: boolean; buttons?: InlineKeyboard };
+
+function textPayload({ text, markdown, buttons }: OutgoingText, { asHtml }: { asHtml: boolean }) {
+  return {
+    text: asHtml ? markdownToTelegramHtml(text) : text,
+    ...(asHtml ? { parse_mode: "HTML" } : {}),
+    ...(buttons ? { reply_markup: { inline_keyboard: buttons } } : {}),
+    link_preview_options: { is_disabled: true },
+  };
 }
 
-/** Telegram hard-caps messages at 4096 characters; send long answers in order. Resolves to the sent message ids. */
-export async function sendTelegramMessage(chatId: number, replyToMessageId: number, text: string): Promise<number[]> {
-  const sentIds: number[] = [];
-  for (const chunk of splitTelegramMessage(text)) {
-    const sent = await callTelegram<{ message_id: number }>("sendMessage", {
-      chat_id: chatId,
-      text: chunk,
-      reply_parameters: { message_id: replyToMessageId, allow_sending_without_reply: true },
-    });
-    sentIds.push(sent.message_id);
+/** HTML that Telegram can't parse is resent as the plain source text rather than failing the message. */
+async function withPlainFallback<T>(out: OutgoingText, send: (payload: ReturnType<typeof textPayload>) => Promise<T>): Promise<T> {
+  if (!out.markdown) return send(textPayload(out, { asHtml: false }));
+  try {
+    return await send(textPayload(out, { asHtml: true }));
+  } catch (error) {
+    if (!(error instanceof TelegramApiError && error.status === 400 && /parse entities/i.test(error.description))) throw error;
+    return send(textPayload(out, { asHtml: false }));
   }
+}
+
+/** Send one message (at most MESSAGE_CHUNK characters of source text), optionally as a reply. Resolves to its id. */
+export async function sendText(chatId: number, replyToMessageId: number | null, out: OutgoingText): Promise<number> {
+  const reply = replyToMessageId === null ? {} : { reply_parameters: { message_id: replyToMessageId, allow_sending_without_reply: true } };
+  const sent = await withPlainFallback(out, (payload) =>
+    callTelegram<{ message_id: number }>("sendMessage", { chat_id: chatId, ...payload, ...reply }),
+  );
+  return sent.message_id;
+}
+
+export async function editText(chatId: number, messageId: number, out: OutgoingText): Promise<void> {
+  await withPlainFallback(out, (payload) => callTelegram("editMessageText", { chat_id: chatId, message_id: messageId, ...payload }));
+}
+
+export async function editButtons(chatId: number, messageId: number, buttons: InlineKeyboard): Promise<void> {
+  await callTelegram("editMessageReplyMarkup", { chat_id: chatId, message_id: messageId, reply_markup: { inline_keyboard: buttons } });
+}
+
+/** Stops the button's loading spinner; `text` shows as a small toast. Must happen within ~15s of the tap. */
+export async function answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
+  await callTelegram("answerCallbackQuery", { callback_query_id: callbackQueryId, ...(text ? { text } : {}) });
+}
+
+/** Source characters per message: below Telegram's 4096 cap, leaving room for HTML escapes and tags. */
+export const MESSAGE_CHUNK = 3500;
+
+/** A long Markdown text as the messages it will be sent as, in order. */
+export function toParts(text: string): [OutgoingText, ...OutgoingText[]] {
+  const [first, ...rest] = splitTelegramMessage(text);
+  return [{ text: first, markdown: true }, ...rest.map((chunk): OutgoingText => ({ text: chunk, markdown: true }))];
+}
+
+/** Send a long text in order, as replies when `replyToMessageId` is given. Resolves to the sent message ids. */
+export async function sendTelegramMessage(chatId: number, replyToMessageId: number | null, text: string): Promise<number[]> {
+  const sentIds: number[] = [];
+  for (const part of toParts(text)) sentIds.push(await sendText(chatId, replyToMessageId, part));
   return sentIds;
 }
 
 /** Split on paragraph/line/word boundaries so long answers stay under the 4096 character cap. */
-export function splitTelegramMessage(text: string, limit = 4000): string[] {
+export function splitTelegramMessage(text: string, limit = MESSAGE_CHUNK): [string, ...string[]] {
   const trimmed = text.trim();
   if (!trimmed) return ["(no answer)"];
 
@@ -117,5 +185,6 @@ export function splitTelegramMessage(text: string, limit = 4000): string[] {
   }
 
   if (rest) chunks.push(rest);
-  return chunks;
+  const [first = "(no answer)", ...others] = chunks;
+  return [first, ...others];
 }

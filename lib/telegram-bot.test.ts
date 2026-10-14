@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessDeniedReply, chatAccess, engagementFor, parseAllowedChatIds, senderDisplayName } from "@/lib/telegram-bot";
+import { accessDeniedReply, chatAccess, engagementFor, parseAllowedChatIds, parseCallbackData, senderDisplayName } from "@/lib/telegram-bot";
 import { splitTelegramMessage } from "@/lib/telegram";
 import type { TelegramMessage } from "@/lib/telegram";
 
@@ -109,7 +109,7 @@ describe("engagementFor with Telegram entities", () => {
     expect(result).toEqual({ respond: true, kind: "help" });
   });
 
-  it("turns /summary into a save-summary request for the named tender", () => {
+  it("turns /summary into a draft request for the named tender", () => {
     const result = engagementFor(
       groupMessage({ text: "/summary Bathurst water", entities: [{ type: "bot_command", offset: 0, length: 8 }] }),
       bot,
@@ -118,7 +118,7 @@ describe("engagementFor with Telegram entities", () => {
     expect(result).toEqual({
       respond: true,
       kind: "question",
-      question: 'Write a summary for the tender "Bathurst water" from its converted documents and save it.',
+      question: 'Draft a summary for the tender "Bathurst water" from its converted documents.',
     });
   });
 
@@ -135,6 +135,36 @@ describe("engagementFor with Telegram entities", () => {
     expect(unknown("/poll lunch?", 5)).toEqual({ respond: false });
     expect(unknown("/constructor", 12)).toEqual({ respond: false });
     expect(unknown("/poll@rfpmanager_bot lunch?", 20)).toEqual({ respond: true, kind: "help" });
+  });
+});
+
+describe("commands", () => {
+  it("answers /digest in a group without the model", () => {
+    const result = engagementFor(groupMessage({ text: "/digest", entities: [{ type: "bot_command", offset: 0, length: 7 }] }), bot);
+
+    expect(result).toEqual({ respond: true, kind: "digest" });
+  });
+
+  it("turns /summary into a draft request rather than a save", () => {
+    const result = engagementFor(groupMessage({ text: "/summary Orange", entities: [{ type: "bot_command", offset: 0, length: 8 }] }), bot);
+
+    expect(result).toEqual({
+      respond: true,
+      kind: "question",
+      question: 'Draft a summary for the tender "Orange" from its converted documents.',
+    });
+  });
+});
+
+describe("parseCallbackData", () => {
+  it("reads the bot's own button payloads and ignores anything else", () => {
+    expect(parseCallbackData("more")).toEqual({ kind: "more" });
+    expect(parseCallbackData("save:6f1c2a7e-0b9d-4c3e-9a51-2f8d7e6c5b4a")).toEqual({
+      kind: "save",
+      rfpId: "6f1c2a7e-0b9d-4c3e-9a51-2f8d7e6c5b4a",
+    });
+    expect(parseCallbackData("save:not-a-uuid")).toEqual({ kind: "ignore" });
+    expect(parseCallbackData(undefined)).toEqual({ kind: "ignore" });
   });
 });
 
@@ -175,19 +205,19 @@ describe("chatAccess", () => {
     chatId === groupId && userId === memberId;
 
   it("allows listed groups and refuses others", async () => {
-    expect(await chatAccess(groupMessage(), allowed)).toBe("allowed");
-    expect(await chatAccess(groupMessage({ chat: { id: -555, type: "group" } }), allowed)).toBe("chat_not_allowed");
+    expect(await chatAccess({ chat: { id: -100, type: "supergroup" }, userId: 7 }, allowed)).toBe("allowed");
+    expect(await chatAccess({ chat: { id: -555, type: "group" }, userId: 7 }, allowed)).toBe("chat_not_allowed");
   });
 
   it("allows private chats only with members of an allowed group", async () => {
-    const dm = groupMessage({ chat: { id: 7, type: "private" } });
+    const dm = { chat: { id: 7, type: "private" as const }, userId: 7 };
 
     expect(await chatAccess(dm, allowed, memberOf(-100, 7))).toBe("allowed");
     expect(await chatAccess(dm, allowed, memberOf(-100, 8))).toBe("not_a_member");
   });
 
   it("treats a failed membership lookup as not a member", async () => {
-    const dm = groupMessage({ chat: { id: 7, type: "private" } });
+    const dm = { chat: { id: 7, type: "private" as const }, userId: 7 };
     const failing = async () => {
       throw new Error("Telegram getChatMember failed (400)");
     };
