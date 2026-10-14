@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chatAccess, engagementFor, parseAllowedChatIds, senderDisplayName } from "@/lib/telegram-bot";
+import { accessDeniedReply, chatAccess, engagementFor, parseAllowedChatIds, senderDisplayName } from "@/lib/telegram-bot";
 import { splitTelegramMessage } from "@/lib/telegram";
 import type { TelegramMessage } from "@/lib/telegram";
 
@@ -135,6 +135,31 @@ describe("engagementFor with Telegram entities", () => {
 describe("parseAllowedChatIds", () => {
   it("reads comma and space separated ids and drops junk", () => {
     expect([...parseAllowedChatIds("-1001234567890, -42 abc,, 0")]).toEqual([-1001234567890, -42]);
+  });
+
+  it("survives what a dashboard paste adds: name prefix, quotes, brackets, typographic minus", () => {
+    expect([...parseAllowedChatIds('TELEGRAM_ALLOWED_CHAT_IDS="-1001234567890"')]).toEqual([-1001234567890]);
+    expect([...parseAllowedChatIds("['−1001234567890'; '–42']")]).toEqual([-1001234567890, -42]);
+  });
+});
+
+describe("accessDeniedReply", () => {
+  const unlisted = groupMessage({ chat: { id: -1009, type: "supergroup" } });
+
+  it("says when the deployment loaded no chat IDs at all", () => {
+    expect(accessDeniedReply("chat_not_allowed", unlisted, 0)).toBe(
+      [
+        "This group isn't enabled for the RFPmanager bot yet.",
+        "Chat ID: -1009",
+        "This deployment has no allowed chat IDs: TELEGRAM_ALLOWED_CHAT_IDS is missing for Production, empty, or not a number. Set it to the chat ID above and redeploy.",
+      ].join("\n"),
+    );
+  });
+
+  it("says when other IDs loaded but this one does not match", () => {
+    expect(accessDeniedReply("chat_not_allowed", unlisted, 1).split("\n")[2]).toBe(
+      "This deployment allows 1 other chat ID, but not this one. Make TELEGRAM_ALLOWED_CHAT_IDS match the chat ID above exactly (minus sign included) and redeploy.",
+    );
   });
 });
 

@@ -142,11 +142,19 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-/** Chat IDs from a comma/space separated env value, e.g. "-1001234567890, -1009876543210". */
+/**
+ * Chat IDs from a comma/space separated env value, e.g. "-1001234567890, -1009876543210". Tolerates what a
+ * dashboard paste tends to add: quotes, brackets, a leading "NAME=" and typographic minus signs.
+ */
 export function parseAllowedChatIds(value: string | undefined): Set<number> {
+  const cleaned = (value ?? "")
+    .replace(/^\s*TELEGRAM_ALLOWED_CHAT_IDS\s*=/i, "")
+    .replace(/["'`[\]]/g, "")
+    .replace(/[−–—]/g, "-");
+
   return new Set(
-    (value ?? "")
-      .split(/[\s,]+/)
+    cleaned
+      .split(/[\s,;]+/)
       .map((item) => Number(item))
       .filter((id) => Number.isSafeInteger(id) && id !== 0),
   );
@@ -176,13 +184,20 @@ export async function chatAccess(
   return "not_a_member";
 }
 
-function accessDeniedReply(access: Exclude<ChatAccess, "allowed">, message: TelegramMessage): string {
+/** Says what this deployment actually loaded (a count, never the other IDs) so a bad env value is easy to spot. */
+export function accessDeniedReply(
+  access: Exclude<ChatAccess, "allowed">,
+  message: TelegramMessage,
+  allowedCount: number,
+): string {
   switch (access) {
     case "chat_not_allowed":
       return [
         "This group isn't enabled for the RFPmanager bot yet.",
         `Chat ID: ${message.chat.id}`,
-        "Add it to TELEGRAM_ALLOWED_CHAT_IDS in Vercel and redeploy.",
+        allowedCount === 0
+          ? "This deployment has no allowed chat IDs: TELEGRAM_ALLOWED_CHAT_IDS is missing for Production, empty, or not a number. Set it to the chat ID above and redeploy."
+          : `This deployment allows ${allowedCount} other chat ID${allowedCount === 1 ? "" : "s"}, but not this one. Make TELEGRAM_ALLOWED_CHAT_IDS match the chat ID above exactly (minus sign included) and redeploy.`,
       ].join("\n");
     case "not_a_member":
       return "Sorry, I only answer members of the team's RFPmanager group.";
@@ -439,9 +454,11 @@ export async function handleTelegramMessage(message: TelegramMessage, { deadline
   const engagement = engagementFor(message, { id: botUser.id, username: botUser.username ?? "" });
   if (!engagement.respond) return;
 
-  const access = await chatAccess(message, parseAllowedChatIds(process.env.TELEGRAM_ALLOWED_CHAT_IDS));
+  const allowedChatIds = parseAllowedChatIds(process.env.TELEGRAM_ALLOWED_CHAT_IDS);
+  const access = await chatAccess(message, allowedChatIds);
   if (access !== "allowed") {
-    await sendTelegramMessage(message.chat.id, message.message_id, accessDeniedReply(access, message));
+    console.warn("Telegram bot refused chat:", { chatId: message.chat.id, access, allowedCount: allowedChatIds.size });
+    await sendTelegramMessage(message.chat.id, message.message_id, accessDeniedReply(access, message, allowedChatIds.size));
     return;
   }
 
