@@ -11,3 +11,4 @@ yarn-error.log*
 pnpm-debug.log*
 public/anydoc/anydoc_wasm.js
 public/anydoc/anydoc_wasm_bg.wasm
+tsconfig.tsbuildinfo

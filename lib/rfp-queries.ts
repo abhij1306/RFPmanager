@@ -24,6 +24,32 @@ export async function listRfpIndex(): Promise<RfpListItem[]> {
   }));
 }
 
+export type RfpDigestItem = Pick<
+  Rfp,
+  "id" | "client_name" | "tender_code" | "status" | "pipeline_stage" | "closing_date" | "closing_date_text" | "summary_generated_at"
+> & {
+  document_count: number;
+};
+
+type RfpDigestRow = Omit<RfpDigestItem, "document_count"> & { rfp_documents: Array<{ count: number }> | null };
+
+/** One round trip for the Telegram bot's tender overview: status fields plus document count, no long text columns. */
+export async function listRfpDigest(): Promise<RfpDigestItem[]> {
+  const { data, error } = await getSupabase()
+    .from("rfps")
+    .select("id, client_name, tender_code, status, pipeline_stage, closing_date, closing_date_text, summary_generated_at, rfp_documents(count)")
+    .order("closing_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .overrideTypes<RfpDigestRow[], { merge: false }>();
+
+  if (error) throw toError(error, "Could not load RFPs.");
+
+  return (data ?? []).map(({ rfp_documents: documents, ...rfp }) => ({
+    ...rfp,
+    document_count: documents?.[0]?.count ?? 0,
+  }));
+}
+
 export type RfpDuplicateCandidate = Pick<
   Rfp,
   "id" | "client_name" | "tender_code" | "tender_link" | "closing_date" | "closing_date_text" | "description" | "contact_person" | "contact_phone" | "contact_email" | "document_links"
