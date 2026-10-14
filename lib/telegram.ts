@@ -1,5 +1,7 @@
 /** Minimal Telegram Bot API client: only what the group brainstorm bot needs. */
 
+import { memoizeAsync } from "@/lib/memoize-async";
+
 export type TelegramUser = {
   id: number;
   is_bot: boolean;
@@ -60,18 +62,13 @@ async function callTelegram<T>(method: string, payload: Record<string, unknown>)
   return body.result as T;
 }
 
-let cachedBotUser: Promise<TelegramUser> | null = null;
-
 /** Identity of this bot, cached for the lifetime of the (warm) function instance. Failures are not cached. */
-export function getBotUser(): Promise<TelegramUser> {
-  if (!cachedBotUser) {
-    const pending = callTelegram<TelegramUser>("getMe", {});
-    cachedBotUser = pending;
-    pending.catch(() => {
-      if (cachedBotUser === pending) cachedBotUser = null;
-    });
-  }
-  return cachedBotUser;
+export const getBotUser = memoizeAsync(() => callTelegram<TelegramUser>("getMe", {}));
+
+/** "First Last", else the @username, else the fallback. */
+export function displayName(user: TelegramUser | undefined, fallback: string): string {
+  if (!user) return fallback;
+  return [user.first_name, user.last_name].filter(Boolean).join(" ").trim() || user.username || fallback;
 }
 
 type ChatMember = { status: "creator" | "administrator" | "member" | "restricted" | "left" | "kicked"; is_member?: boolean };

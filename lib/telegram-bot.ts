@@ -3,9 +3,11 @@ import { readCompanyProfile } from "@/lib/company-profile";
 import { getDocumentExcerptForChatgpt, listDocumentSummariesForChatgpt, MAX_DOCUMENT_LIST_LIMIT } from "@/lib/chatgpt-documents";
 import { listRfpDigest } from "@/lib/rfp-queries";
 import { getRfp, updateRfpSummary } from "@/lib/rfps";
-import { runResponsesTurn, type ResponseTool } from "@/lib/openai-responses";
-import { loadMemory, memoryToInput, supabaseExchangeStore, type Memory } from "@/lib/telegram-memory";
+import { truncate } from "@/lib/display";
+import { runResponsesTurn, type HistoryItem, type ResponseTool } from "@/lib/openai-responses";
+import { loadMemory, memoryToInput, rememberExchange, supabaseExchangeStore } from "@/lib/telegram-memory";
 import {
+  displayName,
   getBotUser,
   isChatMember,
   sendChatTyping,
@@ -49,19 +51,28 @@ export const HELP_TEXT = [
   "/help - this message",
 ].join("\n");
 
-/** Each command turns its argument text into the question the model answers. */
-const COMMANDS: Record<string, (rest: string) => string> = {
-  ask: (rest) => rest || EMPTY_QUESTION,
+const HELP: Engagement = { respond: true, kind: "help" };
+
+/** Every command the bot answers: each turns its argument text into what the bot does. */
+const COMMANDS: Record<string, (rest: string) => Engagement> = {
+  ask: (rest) => asQuestion(rest),
   tenders: (rest) =>
-    `List all our tenders with bid status, pipeline stage and closing date, soonest closing first.${rest ? ` Focus on: ${rest}` : ""}`,
+    asQuestion(`List all our tenders with bid status, pipeline stage and closing date, soonest closing first.${rest ? ` Focus on: ${rest}` : ""}`),
   due: (rest) => {
     const days = Number.parseInt(rest, 10) > 0 ? Number.parseInt(rest, 10) : 14;
-    return `Today is ${new Date().toISOString().slice(0, 10)}. Which tenders close in the next ${days} days? Give each one's closing date and status.`;
+    return asQuestion(
+      `Today is ${new Date().toISOString().slice(0, 10)}. Which tenders close in the next ${days} days? Give each one's closing date and status.`,
+    );
   },
   summary: (rest) =>
-    rest
-      ? `Write a summary for the tender "${rest}" from its converted documents and save it.`
-      : "I want a tender summary written and saved but did not say which tender. Ask me which one, listing the candidates.",
+    asQuestion(
+      rest
+        ? `Write a summary for the tender "${rest}" from its converted documents and save it.`
+        : "I want a tender summary written and saved but did not say which tender. Ask me which one, listing the candidates.",
+    ),
+  clear: () => ({ respond: true, kind: "clear" }),
+  help: () => HELP,
+  start: () => HELP,
 };
 
 /**
@@ -79,14 +90,11 @@ export function engagementFor(message: TelegramMessage, bot: BotIdentity): Engag
   const isPrivate = message.chat.type === "private";
 
   if (command) {
-    if (command.name === "help" || command.name === "start") return { respond: true, kind: "help" };
-    if (command.name === "clear") return { respond: true, kind: "clear" };
     // hasOwn so /constructor or /tostring can't reach Object.prototype.
-    const toQuestion = Object.hasOwn(COMMANDS, command.name) ? COMMANDS[command.name] : undefined;
-    const rest = removeRanges(text, [command, ...ownMentions]);
-    if (toQuestion) return asQuestion(toQuestion(rest));
+    const toEngagement = Object.hasOwn(COMMANDS, command.name) ? COMMANDS[command.name] : undefined;
+    if (toEngagement) return toEngagement(removeRanges(text, [command, ...ownMentions]));
     // Unknown commands: ours when addressed to us or in a DM; in a group a bare /cmd may be for another bot.
-    if (command.addressedToUs || isPrivate) return { respond: true, kind: "help" };
+    if (command.addressedToUs || isPrivate) return HELP;
     return { respond: false };
   }
 
@@ -214,14 +222,7 @@ export function accessDeniedReply(
 }
 
 export function senderDisplayName(message: TelegramMessage): string {
-  const from = message.from;
-  if (!from) return "there";
-  return [from.first_name, from.last_name].filter(Boolean).join(" ").trim() || from.username || "there";
-}
-
-function truncate(value: string | null | undefined, limit: number): string | null {
-  if (!value) return null;
-  return value.length > limit ? `${value.slice(0, limit)}...` : value;
+  return displayName(message.from, "there");
 }
 
 const tools: ResponseTool[] = [
@@ -375,12 +376,12 @@ async function handleToolCall(name: string, rawArgs: Record<string, unknown>): P
         closing_date: rfp.closing_date,
         closing_date_text: rfp.closing_date_text,
         tender_link: rfp.tender_link,
-        description: truncate(rfp.description, 2000),
+        description: rfp.description ? truncate(rfp.description, 2000) : null,
         contact_person: rfp.contact_person,
         contact_email: rfp.contact_email,
         contact_phone: rfp.contact_phone,
-        notes: truncate(rfp.notes, 2000),
-        summary: truncate(rfp.summary, 6000),
+        notes: rfp.notes ? truncate(rfp.notes, 2000) : null,
+        summary: rfp.summary ? truncate(rfp.summary, 6000) : null,
         summary_generated_at: rfp.summary_generated_at,
       });
     }
@@ -458,13 +459,13 @@ function buildInstructions(askerName: string): string {
 export async function answerQuestion(
   message: TelegramMessage,
   question: string,
-  { memory, signal }: { memory?: Memory; signal?: AbortSignal } = {},
+  { history = [], signal }: { history?: HistoryItem[]; signal?: AbortSignal } = {},
 ): Promise<string> {
   const asker = senderDisplayName(message);
 
   return runResponsesTurn({
     instructions: buildInstructions(asker),
-    history: memory ? memoryToInput(memory) : [],
+    history,
     input: `${asker} asks: ${question}`,
     tools,
     onFunctionCall: handleToolCall,
@@ -473,16 +474,6 @@ export async function answerQuestion(
 }
 
 const TYPING_REFRESH_MS = 4500;
-
-/** Memory is best effort: a missing table or failed query means answering without it, never failing. */
-async function loadMemorySafely(message: TelegramMessage, botId: number): Promise<Memory | undefined> {
-  try {
-    return await loadMemory(message, botId);
-  } catch (error) {
-    console.warn("Telegram bot answering without memory:", error);
-    return undefined;
-  }
-}
 
 /**
  * Handle one incoming message end to end. Nothing is sent unless the message is addressed to the bot, and
@@ -493,6 +484,16 @@ export async function handleTelegramMessage(message: TelegramMessage, { deadline
   const botUser = await getBotUser();
   const engagement = engagementFor(message, { id: botUser.id, username: botUser.username ?? "" });
   if (!engagement.respond) return;
+
+  // Memory is best effort (a missing table or failed query means answering without it), and it doesn't
+  // depend on the access check, so start loading it now.
+  const memory =
+    engagement.kind === "question"
+      ? loadMemory(message, botUser.id).catch((error: unknown) => {
+          console.warn("Telegram bot answering without memory:", error);
+          return undefined;
+        })
+      : undefined;
 
   const allowedChatIds = parseAllowedChatIds(process.env.TELEGRAM_ALLOWED_CHAT_IDS);
   const access = await chatAccess(message, allowedChatIds);
@@ -524,37 +525,29 @@ export async function handleTelegramMessage(message: TelegramMessage, { deadline
   showTyping();
   const typing = setInterval(showTyping, TYPING_REFRESH_MS);
 
-  let outcome: { answered: true; text: string } | { answered: false; text: string };
+  let reply: string;
+  let answered = false;
   try {
-    const memory = await loadMemorySafely(message, botUser.id);
-    const text = await answerQuestion(message, engagement.question, { memory, signal: AbortSignal.timeout(deadlineMs) });
-    outcome = { answered: true, text };
+    const recalled = await memory;
+    reply = await answerQuestion(message, engagement.question, {
+      history: recalled ? memoryToInput(recalled) : [],
+      signal: AbortSignal.timeout(deadlineMs),
+    });
+    answered = true;
   } catch (error) {
     console.error("Telegram bot failed to answer:", error);
-    outcome = {
-      answered: false,
-      text:
-        error instanceof Error && error.name === "TimeoutError"
-          ? "Sorry, that took too long to work out. Try a narrower question (one tender or one document at a time)."
-          : "Sorry, something went wrong on my side. Please try again in a moment.",
-    };
+    reply =
+      error instanceof Error && error.name === "TimeoutError"
+        ? "Sorry, that took too long to work out. Try a narrower question (one tender or one document at a time)."
+        : "Sorry, something went wrong on my side. Please try again in a moment.";
   } finally {
     clearInterval(typing);
   }
 
-  const botMessageIds = await sendTelegramMessage(message.chat.id, message.message_id, outcome.text);
-  if (!outcome.answered) return;
+  const botMessageIds = await sendTelegramMessage(message.chat.id, message.message_id, reply);
+  if (!answered) return;
 
-  const parent = message.reply_to_message;
-  await supabaseExchangeStore
-    .insert({
-      chat_id: message.chat.id,
-      question_message_id: message.message_id,
-      reply_to_bot_message_id: parent?.from?.id === botUser.id ? parent.message_id : null,
-      bot_message_ids: botMessageIds,
-      asker_name: senderDisplayName(message),
-      question: engagement.question,
-      answer: outcome.text,
-    })
-    .catch((error: unknown) => console.warn("Telegram bot could not remember this exchange:", error));
+  await rememberExchange({ message, botId: botUser.id, question: engagement.question, answer: reply, botMessageIds }).catch(
+    (error: unknown) => console.warn("Telegram bot could not remember this exchange:", error),
+  );
 }

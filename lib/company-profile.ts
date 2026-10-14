@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { memoizeAsync } from "@/lib/memoize-async";
 
 /**
  * HTC Global's company profile (docs/htc-knowledge-base.md), served to the Telegram bot section by section
@@ -52,15 +53,8 @@ export function readProfileSections(sections: ProfileSection[], query: string | 
   return matches.map((section) => `# ${section.title}\n\n${section.body}`).join("\n\n");
 }
 
-let cachedSections: Promise<ProfileSection[]> | null = null;
+const loadSections = memoizeAsync(() => readFile(PROFILE_PATH, "utf8").then(splitProfileSections));
 
 export async function readCompanyProfile(query: string | undefined): Promise<string> {
-  if (!cachedSections) {
-    const pending = readFile(PROFILE_PATH, "utf8").then(splitProfileSections);
-    cachedSections = pending;
-    pending.catch(() => {
-      if (cachedSections === pending) cachedSections = null;
-    });
-  }
-  return readProfileSections(await cachedSections, query);
+  return readProfileSections(await loadSections(), query);
 }

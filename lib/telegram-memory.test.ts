@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadMemory, memoryToInput, type Exchange, type ExchangeStore } from "@/lib/telegram-memory";
+import { loadMemory, memoryToInput, rememberExchange, type Exchange, type ExchangeStore } from "@/lib/telegram-memory";
 import type { TelegramMessage } from "@/lib/telegram";
 
 const BOT_ID = 99;
@@ -20,6 +20,14 @@ function exchange(overrides: Partial<Exchange> & Pick<Exchange, "bot_message_ids
 /** In-memory stand-in for the telegram_exchanges table. */
 function storeOf(rows: Exchange[]): ExchangeStore {
   return {
+    async insert(row) {
+      rows.push({ ...row, created_at: now.toISOString() });
+    },
+    async clearChat(chatId) {
+      const before = rows.length;
+      rows.splice(0, rows.length, ...rows.filter((row) => row.chat_id !== chatId));
+      return before - rows.length;
+    },
     async findByBotMessage(chatId, botMessageId) {
       return rows.find((row) => row.chat_id === chatId && row.bot_message_ids.includes(botMessageId)) ?? null;
     },
@@ -98,6 +106,30 @@ describe("loadMemory", () => {
     expect(memory).toEqual({
       kind: "recent",
       turns: [{ asker_name: "Priya Shah", question: "what closes Friday?", answer: "Bathurst." }],
+    });
+  });
+});
+
+describe("rememberExchange", () => {
+  it("links a follow-up to the bot message it replied to, so the thread replays both turns", async () => {
+    const store = storeOf([]);
+    const first = message({ message_id: 60, text: "@rfpmanager_bot which tenders are open?" });
+    await rememberExchange({ message: first, botId: BOT_ID, question: "which tenders are open?", answer: "Bathurst.", botMessageIds: [61] }, { store });
+
+    const followUp = message({ message_id: 62, text: "and its closing date?", reply_to_message: botReply(61) });
+    await rememberExchange(
+      { message: followUp, botId: BOT_ID, question: "and its closing date?", answer: "20 October.", botMessageIds: [63] },
+      { store },
+    );
+
+    const memory = await loadMemory(message({ reply_to_message: botReply(63) }), BOT_ID, { store, now });
+
+    expect(memory).toEqual({
+      kind: "thread",
+      turns: [
+        { asker_name: "Priya Shah", question: "which tenders are open?", answer: "Bathurst." },
+        { asker_name: "Priya Shah", question: "and its closing date?", answer: "20 October." },
+      ],
     });
   });
 });

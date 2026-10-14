@@ -1,6 +1,8 @@
 import { toError } from "@/lib/errors";
 import { getSupabase } from "@/lib/supabase";
-import type { TelegramMessage } from "@/lib/telegram";
+import { truncate } from "@/lib/display";
+import type { HistoryItem } from "@/lib/openai-responses";
+import { displayName, type TelegramMessage } from "@/lib/telegram";
 
 /**
  * Conversation memory for the Telegram bot, stored in telegram_exchanges (supabase/telegram-memory-2026-10.sql).
@@ -36,15 +38,15 @@ export type Memory =
 export type ExchangeStore = {
   findByBotMessage(chatId: number, botMessageId: number): Promise<Exchange | null>;
   listRecent(chatId: number, since: Date, limit: number): Promise<Exchange[]>;
+  insert(exchange: Omit<Exchange, "created_at">): Promise<void>;
+  /** Forget one chat's conversation (/clear). Resolves to the number of exchanges deleted. */
+  clearChat(chatId: number): Promise<number>;
 };
 
 const exchangeFields =
   "chat_id, question_message_id, reply_to_bot_message_id, bot_message_ids, asker_name, question, answer, created_at";
 
-export const supabaseExchangeStore: ExchangeStore & {
-  insert(exchange: Omit<Exchange, "created_at">): Promise<void>;
-  clearChat(chatId: number): Promise<number>;
-} = {
+export const supabaseExchangeStore: ExchangeStore = {
   async findByBotMessage(chatId, botMessageId) {
     const { data, error } = await getSupabase()
       .from("telegram_exchanges")
@@ -76,7 +78,6 @@ export const supabaseExchangeStore: ExchangeStore & {
     if (error) throw toError(error, "Could not save Telegram conversation.");
   },
 
-  /** Forget one chat's conversation (/clear). Resolves to the number of exchanges deleted. */
   async clearChat(chatId) {
     const { data, error } = await getSupabase().rpc("clear_telegram_memory", { p_chat_id: chatId });
     if (error) throw toError(error, "Could not clear Telegram conversation.");
@@ -85,13 +86,19 @@ export const supabaseExchangeStore: ExchangeStore & {
 };
 
 function toTurn(exchange: Exchange): MemoryTurn {
-  const answer =
-    exchange.answer.length > MAX_REMEMBERED_ANSWER ? `${exchange.answer.slice(0, MAX_REMEMBERED_ANSWER)}...` : exchange.answer;
-  return { asker_name: exchange.asker_name, question: exchange.question, answer };
+  return { asker_name: exchange.asker_name, question: exchange.question, answer: truncate(exchange.answer, MAX_REMEMBERED_ANSWER) };
 }
 
+/** The id of the bot message this message replies to, or null when it is not a reply to the bot. */
+function repliedBotMessageId(message: TelegramMessage, botId: number): number | null {
+  const parent = message.reply_to_message;
+  return parent?.from?.id === botId ? parent.message_id : null;
+}
+
+type ExchangeReader = Pick<ExchangeStore, "findByBotMessage" | "listRecent">;
+
 /** Walk a reply thread back from the bot message being replied to, oldest turn first. */
-async function loadThread(store: ExchangeStore, chatId: number, botMessageId: number): Promise<MemoryTurn[]> {
+async function loadThread(store: ExchangeReader, chatId: number, botMessageId: number): Promise<MemoryTurn[]> {
   const turns: MemoryTurn[] = [];
   const seen = new Set<number>();
   let next: number | null = botMessageId;
@@ -110,27 +117,51 @@ async function loadThread(store: ExchangeStore, chatId: number, botMessageId: nu
 export async function loadMemory(
   message: TelegramMessage,
   botId: number,
-  { store = supabaseExchangeStore, now = new Date() }: { store?: ExchangeStore; now?: Date } = {},
+  { store = supabaseExchangeStore, now = new Date() }: { store?: ExchangeReader; now?: Date } = {},
 ): Promise<Memory> {
   const parent = message.reply_to_message;
   const parentText = parent ? (parent.text ?? parent.caption ?? "").trim() : "";
+  const botParentId = repliedBotMessageId(message, botId);
 
-  if (parent?.from?.id === botId) {
-    const turns = await loadThread(store, message.chat.id, parent.message_id);
+  if (botParentId !== null) {
+    const turns = await loadThread(store, message.chat.id, botParentId);
     if (turns.length > 0) return { kind: "thread", turns };
     // Answer from before memory existed (or not stored): at least the text being replied to is known.
     if (parentText) return { kind: "quoted", author: "you (the bot)", text: parentText };
   } else if (parent && parentText) {
-    const author = [parent.from?.first_name, parent.from?.last_name].filter(Boolean).join(" ") || "a team member";
-    return { kind: "quoted", author, text: parentText };
+    return { kind: "quoted", author: displayName(parent.from, "a team member"), text: parentText };
   }
 
   const recent = await store.listRecent(message.chat.id, new Date(now.getTime() - RECENT_WINDOW_MS), RECENT_TURNS);
   return { kind: "recent", turns: recent.reverse().map(toTurn) };
 }
 
+/** Save an answered question so later replies and mentions can recall it. */
+export function rememberExchange(
+  {
+    message,
+    botId,
+    question,
+    answer,
+    botMessageIds,
+  }: { message: TelegramMessage; botId: number; question: string; answer: string; botMessageIds: number[] },
+  { store = supabaseExchangeStore }: { store?: Pick<ExchangeStore, "insert"> } = {},
+): Promise<void> {
+  return store.insert({
+    chat_id: message.chat.id,
+    question_message_id: message.message_id,
+    reply_to_bot_message_id: repliedBotMessageId(message, botId),
+    bot_message_ids: botMessageIds,
+    asker_name: displayName(message.from, "there"),
+    question,
+    answer,
+  });
+}
+
 /** Memory as Responses API input items placed before the new question. */
-export function memoryToInput(memory: Memory): Array<{ role: "user" | "assistant"; content: string }> {
+export function memoryToInput(memory: Memory): HistoryItem[] {
+  if (memory.kind !== "quoted" && memory.turns.length === 0) return [];
+
   switch (memory.kind) {
     case "thread":
     case "recent": {
@@ -138,7 +169,6 @@ export function memoryToInput(memory: Memory): Array<{ role: "user" | "assistant
         memory.kind === "thread"
           ? "Earlier in this reply thread:"
           : "Recent conversation in this chat (last 30 minutes) - use it only if the new question follows on from it:";
-      if (memory.turns.length === 0) return [];
       return [
         { role: "user", content: note },
         ...memory.turns.flatMap((turn) => [

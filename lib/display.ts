@@ -24,6 +24,11 @@ export function closingInfo(closingDate: string | null, closingDateText?: string
   return { kind: "none" };
 }
 
+/** Cut to `limit` characters, marking the cut with "...". */
+export function truncate(value: string, limit: number): string {
+  return value.length > limit ? `${value.slice(0, limit)}...` : value;
+}
+
 export function formatBytes(bytes: number | null | undefined): string | null {
   if (!bytes || bytes <= 0) return null;
   if (bytes < 1024) return `${bytes} B`;
