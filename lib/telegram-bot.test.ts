@@ -205,19 +205,19 @@ describe("chatAccess", () => {
     chatId === groupId && userId === memberId;
 
   it("allows listed groups and refuses others", async () => {
-    expect(await chatAccess(groupMessage(), allowed)).toBe("allowed");
-    expect(await chatAccess(groupMessage({ chat: { id: -555, type: "group" } }), allowed)).toBe("chat_not_allowed");
+    expect(await chatAccess({ chat: { id: -100, type: "supergroup" }, userId: 7 }, allowed)).toBe("allowed");
+    expect(await chatAccess({ chat: { id: -555, type: "group" }, userId: 7 }, allowed)).toBe("chat_not_allowed");
   });
 
   it("allows private chats only with members of an allowed group", async () => {
-    const dm = groupMessage({ chat: { id: 7, type: "private" } });
+    const dm = { chat: { id: 7, type: "private" as const }, userId: 7 };
 
     expect(await chatAccess(dm, allowed, memberOf(-100, 7))).toBe("allowed");
     expect(await chatAccess(dm, allowed, memberOf(-100, 8))).toBe("not_a_member");
   });
 
   it("treats a failed membership lookup as not a member", async () => {
-    const dm = groupMessage({ chat: { id: 7, type: "private" } });
+    const dm = { chat: { id: 7, type: "private" as const }, userId: 7 };
     const failing = async () => {
       throw new Error("Telegram getChatMember failed (400)");
     };

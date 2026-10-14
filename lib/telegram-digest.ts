@@ -1,6 +1,6 @@
 import { rfpPageUrl } from "@/lib/app-url";
-import { daysUntil, formatDateOnly } from "@/lib/date";
-import { displayTitle } from "@/lib/display";
+import { daysUntil } from "@/lib/date";
+import { closingInfo, displayTitle } from "@/lib/display";
 import type { RfpDigestItem } from "@/lib/rfp-queries";
 
 /**
@@ -15,12 +15,6 @@ export function sydneyNow(now = new Date()): Date {
   return new Date(now.toLocaleString("en-US", { timeZone: "Australia/Sydney" }));
 }
 
-function closesIn(days: number): string {
-  if (days === 0) return "closes today";
-  if (days === 1) return "closes tomorrow";
-  return `closes in ${days} days`;
-}
-
 export function buildDigest(
   rfps: RfpDigestItem[],
   now: Date,
@@ -33,11 +27,14 @@ export function buildDigest(
 
   if (upcoming.length === 0) return `📅 **No tenders close in the next ${DIGEST_DAYS} days.**`;
 
-  const lines = upcoming.map(({ rfp, days }) => {
+  const lines = upcoming.map(({ rfp }) => {
     const name = `**${displayTitle(rfp.client_name)}**`;
     const url = pageUrl(rfp.id);
-    const details = [formatDateOnly(rfp.closing_date), `bid: ${rfp.status}`, rfp.pipeline_stage].filter(Boolean).join(" · ");
-    return `- ${url ? `[${name}](${url})` : name} - ${closesIn(days)} (${details})`;
+    // Same wording as the closing column in the web app ("Tomorrow", "In 11 days").
+    const closing = closingInfo(rfp.closing_date, null, now);
+    const when = closing.kind === "date" ? `${closing.relative} (${closing.label})` : "";
+    const details = [when, `bid: ${rfp.status}`, rfp.pipeline_stage].filter(Boolean).join(" · ");
+    return `- ${url ? `[${name}](${url})` : name} - ${details}`;
   });
 
   return [`📅 **Tenders closing in the next ${DIGEST_DAYS} days**`, "", ...lines].join("\n");

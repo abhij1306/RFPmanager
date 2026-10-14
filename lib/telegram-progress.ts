@@ -11,37 +11,48 @@ export type ProgressMessage = {
 
 /**
  * The message a question gets straight away, so the group sees the bot is on it instead of a silent wait.
- * Status edits are queued, and finish() waits for them, so a late status can never overwrite the answer.
+ * Posting it doesn't hold up the answer. Status edits run one at a time and only the latest waiting status is
+ * shown; once finish() is called no further status is shown, so a late one can never overwrite the answer.
  * If the placeholder can't be posted or edited, the answer is simply sent as new messages.
  */
-export async function startProgress(chatId: number, replyToMessageId: number): Promise<ProgressMessage> {
-  const placeholderId = await sendText(chatId, replyToMessageId, { text: PLACEHOLDER }).catch(() => null);
+export function startProgress(chatId: number, replyToMessageId: number): ProgressMessage {
+  const placeholder = sendText(chatId, replyToMessageId, { text: PLACEHOLDER }).catch(() => null);
   let edits: Promise<void> = Promise.resolve();
-  let finished = false;
+  let waitingStatus: string | null = null;
   let shown = PLACEHOLDER;
+  let finished = false;
+
+  const showWaitingStatus = async () => {
+    const text = waitingStatus;
+    waitingStatus = null;
+    const placeholderId = await placeholder;
+    if (text === null || finished || placeholderId === null) return;
+    await editText(chatId, placeholderId, { text }).catch(() => undefined);
+  };
 
   return {
     status(text) {
       const next = `🔎 ${text}`;
-      if (placeholderId === null || finished || next === shown) return;
+      if (finished || next === shown) return;
       shown = next;
-      edits = edits.then(() => editText(chatId, placeholderId, { text: next })).catch(() => undefined);
+      waitingStatus = next;
+      edits = edits.then(showWaitingStatus);
     },
 
     async finish([first, ...rest]) {
       finished = true;
       await edits;
+      const placeholderId = await placeholder;
 
       const ids: number[] = [];
       let unsent = [first, ...rest];
       if (placeholderId !== null) {
-        const edited = await editText(chatId, placeholderId, first).then(
-          () => true,
-          () => false,
-        );
-        if (edited) {
+        try {
+          await editText(chatId, placeholderId, first);
           ids.push(placeholderId);
           unsent = rest;
+        } catch {
+          // Placeholder gone (deleted, too old): send the whole answer fresh.
         }
       }
 

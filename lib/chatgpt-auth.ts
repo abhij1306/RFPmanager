@@ -16,36 +16,44 @@ function getBearerToken(request: Request): string | null {
   return match?.[1]?.trim() || null;
 }
 
-export function validateChatgptApiKey(request: Request): ApiKeyValidation {
-  const expectedApiKey = process.env.CHATGPT_ACTIONS_API_KEY;
+/**
+ * Check the request's `Authorization: Bearer` token against an env var. Fails closed: 500 when the env var
+ * is unset, 401 when no token was sent, 403 when it doesn't match.
+ */
+export function validateBearerSecret(request: Request, envName: string, secretLabel: string): ApiKeyValidation {
+  const expectedSecret = process.env[envName];
 
-  if (!expectedApiKey) {
+  if (!expectedSecret) {
     return {
       ok: false,
-      error: "Missing CHATGPT_ACTIONS_API_KEY environment variable.",
+      error: `Missing ${envName} environment variable.`,
       status: 500,
     };
   }
 
-  const providedApiKey = getBearerToken(request);
+  const providedSecret = getBearerToken(request);
 
-  if (!providedApiKey) {
+  if (!providedSecret) {
     return {
       ok: false,
-      error: "Missing ChatGPT Actions API key.",
+      error: `Missing ${secretLabel}.`,
       status: 401,
     };
   }
 
-  if (providedApiKey !== expectedApiKey) {
+  if (providedSecret !== expectedSecret) {
     return {
       ok: false,
-      error: "Invalid ChatGPT Actions API key.",
+      error: `Invalid ${secretLabel}.`,
       status: 403,
     };
   }
 
   return { ok: true };
+}
+
+export function validateChatgptApiKey(request: Request): ApiKeyValidation {
+  return validateBearerSecret(request, "CHATGPT_ACTIONS_API_KEY", "ChatGPT Actions API key");
 }
 
 export function chatgptAuthErrorResponse(validation: Exclude<ApiKeyValidation, { ok: true }>) {

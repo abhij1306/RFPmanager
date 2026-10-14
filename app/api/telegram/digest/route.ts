@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
+import { chatgptAuthErrorResponse, validateBearerSecret } from "@/lib/chatgpt-auth";
 import { listRfpDigest } from "@/lib/rfp-queries";
-import { sendText } from "@/lib/telegram";
-import { parseAllowedChatIds } from "@/lib/telegram-bot";
+import { sendTelegramMessage } from "@/lib/telegram";
+import { allowedGroupIds } from "@/lib/telegram-bot";
 import { buildDigest, sydneyNow } from "@/lib/telegram-digest";
 
 export const runtime = "nodejs";
@@ -12,19 +13,15 @@ export const dynamic = "force-dynamic";
  * `Authorization: Bearer $CRON_SECRET`; without CRON_SECRET set, every call is refused.
  */
 export async function GET(request: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) {
-    console.error("Telegram digest refused: CRON_SECRET is not set.");
-    return NextResponse.json({ error: "Missing CRON_SECRET environment variable." }, { status: 500 });
-  }
-  if (request.headers.get("authorization") !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  const auth = validateBearerSecret(request, "CRON_SECRET", "cron secret");
+  if (!auth.ok) {
+    if (auth.status === 500) console.error("Telegram digest refused:", auth.error);
+    return chatgptAuthErrorResponse(auth);
   }
 
   const text = buildDigest(await listRfpDigest(), sydneyNow());
-  // Groups only: the allowlist is meant for group IDs, and a digest shouldn't land in someone's DMs.
-  const groupIds = [...parseAllowedChatIds(process.env.TELEGRAM_ALLOWED_CHAT_IDS)].filter((id) => id < 0);
-  const results = await Promise.allSettled(groupIds.map((chatId) => sendText(chatId, null, { text, markdown: true })));
+  // Groups only: a digest shouldn't land in someone's DMs.
+  const results = await Promise.allSettled(allowedGroupIds().map((chatId) => sendTelegramMessage(chatId, null, text)));
 
   const failed = results.filter((result) => result.status === "rejected");
   for (const failure of failed) console.error("Telegram digest failed for a chat:", failure.reason);

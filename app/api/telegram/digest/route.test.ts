@@ -19,7 +19,7 @@ describe("GET /api/telegram/digest", () => {
   it("rejects callers without the cron secret", async () => {
     vi.stubEnv("CRON_SECRET", "cron_secret");
 
-    expect((await GET(cronRequest("Bearer wrong"))).status).toBe(401);
+    expect((await GET(cronRequest("Bearer wrong"))).status).toBe(403);
     expect((await GET(cronRequest())).status).toBe(401);
   });
 });

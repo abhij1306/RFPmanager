@@ -36,8 +36,8 @@ describe("buildDigest", () => {
       [
         "📅 **Tenders closing in the next 14 days**",
         "",
-        "- [**Bathurst Water**](https://rfp.example/rfp/a) - closes tomorrow (Oct 20, 2026 · bid: TBD · Active)",
-        "- [**Orange Council**](https://rfp.example/rfp/b) - closes in 11 days (Oct 30, 2026 · bid: Yes · Active)",
+        "- [**Bathurst Water**](https://rfp.example/rfp/a) - Tomorrow (Oct 20, 2026) · bid: TBD · Active",
+        "- [**Orange Council**](https://rfp.example/rfp/b) - In 11 days (Oct 30, 2026) · bid: Yes · Active",
       ].join("\n"),
     );
   });

@@ -153,17 +153,21 @@ export async function answerCallbackQuery(callbackQueryId: string, text?: string
 /** Source characters per message: below Telegram's 4096 cap, leaving room for HTML escapes and tags. */
 export const MESSAGE_CHUNK = 3500;
 
-/** Send a long text in order as replies. Resolves to the sent message ids. */
-export async function sendTelegramMessage(chatId: number, replyToMessageId: number, text: string): Promise<number[]> {
+/** A long Markdown text as the messages it will be sent as, in order. */
+export function toParts(text: string): [OutgoingText, ...OutgoingText[]] {
+  const [first, ...rest] = splitTelegramMessage(text);
+  return [{ text: first, markdown: true }, ...rest.map((chunk): OutgoingText => ({ text: chunk, markdown: true }))];
+}
+
+/** Send a long text in order, as replies when `replyToMessageId` is given. Resolves to the sent message ids. */
+export async function sendTelegramMessage(chatId: number, replyToMessageId: number | null, text: string): Promise<number[]> {
   const sentIds: number[] = [];
-  for (const chunk of splitTelegramMessage(text, MESSAGE_CHUNK)) {
-    sentIds.push(await sendText(chatId, replyToMessageId, { text: chunk, markdown: true }));
-  }
+  for (const part of toParts(text)) sentIds.push(await sendText(chatId, replyToMessageId, part));
   return sentIds;
 }
 
 /** Split on paragraph/line/word boundaries so long answers stay under the 4096 character cap. */
-export function splitTelegramMessage(text: string, limit = 4000): string[] {
+export function splitTelegramMessage(text: string, limit = MESSAGE_CHUNK): [string, ...string[]] {
   const trimmed = text.trim();
   if (!trimmed) return ["(no answer)"];
 
@@ -181,5 +185,6 @@ export function splitTelegramMessage(text: string, limit = 4000): string[] {
   }
 
   if (rest) chunks.push(rest);
-  return chunks;
+  const [first = "(no answer)", ...others] = chunks;
+  return [first, ...others];
 }

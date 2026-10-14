@@ -1,23 +1,19 @@
-import { z } from "zod/v4";
-import { readCompanyProfile } from "@/lib/company-profile";
-import { getDocumentExcerptForChatgpt, listDocumentSummariesForChatgpt, MAX_DOCUMENT_LIST_LIMIT } from "@/lib/chatgpt-documents";
 import { listRfpDigest } from "@/lib/rfp-queries";
-import { getRfp, updateRfpSummary } from "@/lib/rfps";
+import { updateRfpSummary } from "@/lib/rfps";
 import { rfpPageUrl } from "@/lib/app-url";
-import { truncate } from "@/lib/display";
-import { runResponsesTurn, type HistoryItem, type ResponseTool } from "@/lib/openai-responses";
+import { runResponsesTurn, type HistoryItem } from "@/lib/openai-responses";
 import { buildDigest, sydneyNow } from "@/lib/telegram-digest";
 import { loadMemory, memoryToInput, rememberExchange, supabaseExchangeStore, type Memory } from "@/lib/telegram-memory";
 import { startProgress } from "@/lib/telegram-progress";
+import { handleToolCall, tools, TOOL_STATUS, type SummaryDraft, type Turn } from "@/lib/telegram-tools";
 import {
   answerCallbackQuery,
   displayName,
   editButtons,
   getBotUser,
   isChatMember,
-  MESSAGE_CHUNK,
   sendTelegramMessage,
-  splitTelegramMessage,
+  toParts,
   type InlineButton,
   type InlineKeyboard,
   type OutgoingText,
@@ -33,10 +29,6 @@ import {
  * Only chats listed in TELEGRAM_ALLOWED_CHAT_IDS (and private chats with members of those chats) get answers.
  */
 
-const DOCUMENT_READ_LIMIT = 20000;
-const PREVIEW_LENGTH = 300;
-/** A draft summary is posted as one message whose text is what Save stores, so it must fit in one message. */
-const MAX_DRAFT_SUMMARY = MESSAGE_CHUNK;
 const EMPTY_QUESTION = "Hi! What would you like to know about our tenders?";
 
 export type BotIdentity = {
@@ -68,27 +60,36 @@ export const HELP_TEXT = [
 const HELP: Engagement = { respond: true, kind: "help" };
 
 /** Every command the bot answers: each turns its argument text into what the bot does. */
-const COMMANDS: Record<string, (rest: string) => Engagement> = {
-  ask: (rest) => asQuestion(rest),
-  tenders: (rest) =>
-    asQuestion(`List all our tenders with bid status, pipeline stage and closing date, soonest closing first.${rest ? ` Focus on: ${rest}` : ""}`),
-  due: (rest) => {
-    const days = Number.parseInt(rest, 10) > 0 ? Number.parseInt(rest, 10) : 14;
-    return asQuestion(
-      `Today is ${new Date().toISOString().slice(0, 10)}. Which tenders close in the next ${days} days? Give each one's closing date and status.`,
-    );
-  },
-  summary: (rest) =>
-    asQuestion(
-      rest
-        ? `Draft a summary for the tender "${rest}" from its converted documents.`
-        : "I want a tender summary drafted but did not say which tender. Ask me which one, listing the candidates.",
-    ),
-  digest: () => ({ respond: true, kind: "digest" }),
-  clear: () => ({ respond: true, kind: "clear" }),
-  help: () => HELP,
-  start: () => HELP,
-};
+const COMMANDS = new Map<string, (rest: string) => Engagement>([
+  ["ask", (rest) => asQuestion(rest)],
+  [
+    "tenders",
+    (rest) =>
+      asQuestion(`List all our tenders with bid status, pipeline stage and closing date, soonest closing first.${rest ? ` Focus on: ${rest}` : ""}`),
+  ],
+  [
+    "due",
+    (rest) => {
+      const days = Number.parseInt(rest, 10) > 0 ? Number.parseInt(rest, 10) : 14;
+      return asQuestion(
+        `Today is ${new Date().toISOString().slice(0, 10)}. Which tenders close in the next ${days} days? Give each one's closing date and status.`,
+      );
+    },
+  ],
+  [
+    "summary",
+    (rest) =>
+      asQuestion(
+        rest
+          ? `Draft a summary for the tender "${rest}" from its converted documents.`
+          : "I want a tender summary drafted but did not say which tender. Ask me which one, listing the candidates.",
+      ),
+  ],
+  ["digest", () => ({ respond: true, kind: "digest" })],
+  ["clear", () => ({ respond: true, kind: "clear" })],
+  ["help", () => HELP],
+  ["start", () => HELP],
+]);
 
 /**
  * Decide whether a message is addressed to the bot, and what the actual question is. In groups that means an
@@ -105,8 +106,7 @@ export function engagementFor(message: TelegramMessage, bot: BotIdentity): Engag
   const isPrivate = message.chat.type === "private";
 
   if (command) {
-    // hasOwn so /constructor or /tostring can't reach Object.prototype.
-    const toEngagement = Object.hasOwn(COMMANDS, command.name) ? COMMANDS[command.name] : undefined;
+    const toEngagement = COMMANDS.get(command.name);
     if (toEngagement) return toEngagement(removeRanges(text, [command, ...ownMentions]));
     // Unknown commands: ours when addressed to us or in a DM; in a group a bare /cmd may be for another bot.
     if (command.addressedToUs || isPrivate) return HELP;
@@ -188,6 +188,16 @@ export function parseAllowedChatIds(value: string | undefined): Set<number> {
   );
 }
 
+/** This deployment's allowlist (TELEGRAM_ALLOWED_CHAT_IDS). */
+export function allowedChatIds(): Set<number> {
+  return parseAllowedChatIds(process.env.TELEGRAM_ALLOWED_CHAT_IDS);
+}
+
+/** The allowed group chats (Telegram group IDs are negative; positive IDs are people). */
+export function allowedGroupIds(): number[] {
+  return [...allowedChatIds()].filter((id) => id < 0);
+}
+
 export type ChatAccess = "allowed" | "chat_not_allowed" | "not_a_member";
 
 /**
@@ -195,18 +205,17 @@ export type ChatAccess = "allowed" | "chat_not_allowed" | "not_a_member";
  * so the team can DM the bot but strangers who find it cannot read tender data.
  */
 export async function chatAccess(
-  message: TelegramMessage,
-  allowedChatIds: Set<number>,
+  { chat, userId }: { chat: TelegramMessage["chat"]; userId: number | undefined },
+  allowed: Set<number>,
   isMember: (chatId: number, userId: number) => Promise<boolean> = isChatMember,
 ): Promise<ChatAccess> {
-  if (message.chat.type !== "private") {
-    return allowedChatIds.has(message.chat.id) ? "allowed" : "chat_not_allowed";
+  if (chat.type !== "private") {
+    return allowed.has(chat.id) ? "allowed" : "chat_not_allowed";
   }
 
-  const userId = message.from?.id;
   if (!userId) return "not_a_member";
 
-  for (const chatId of allowedChatIds) {
+  for (const chatId of allowed) {
     if (await isMember(chatId, userId).catch(() => false)) return "allowed";
   }
   return "not_a_member";
@@ -240,247 +249,6 @@ export function senderDisplayName(message: TelegramMessage): string {
   return displayName(message.from, "there");
 }
 
-const tools: ResponseTool[] = [
-  {
-    type: "function",
-    name: "list_rfps",
-    description:
-      "List the tenders (RFPs) tracked in RFPmanager: client name, tender code, bid status, pipeline stage, closing date, when a summary was last saved (null if never), and converted document count.",
-    parameters: {
-      type: "object",
-      properties: {},
-      additionalProperties: false,
-    },
-  },
-  {
-    type: "function",
-    name: "get_rfp_details",
-    description: "Get one RFP's full metadata and saved summary. Use the id from list_rfps.",
-    parameters: {
-      type: "object",
-      properties: {
-        rfp_id: { type: "string", description: "RFP UUID from list_rfps." },
-      },
-      required: ["rfp_id"],
-      additionalProperties: false,
-    },
-  },
-  {
-    type: "function",
-    name: "list_rfp_documents",
-    description: `List the converted (Markdown) documents for one RFP, ${MAX_DOCUMENT_LIST_LIMIT} at a time, with a short preview of each. Never returns raw source files - only converted text.`,
-    parameters: {
-      type: "object",
-      properties: {
-        rfp_id: { type: "string", description: "RFP UUID from list_rfps." },
-        offset: { type: "integer", description: "Pass next_offset from a previous call to see more documents (default 0)." },
-      },
-      required: ["rfp_id"],
-      additionalProperties: false,
-    },
-  },
-  {
-    type: "function",
-    name: "read_rfp_document",
-    description:
-      "Read a slice of one converted document's Markdown. Pass next_offset from the previous read to page through long documents.",
-    parameters: {
-      type: "object",
-      properties: {
-        rfp_id: { type: "string", description: "RFP UUID from list_rfps." },
-        document_id: { type: "string", description: "Document UUID from list_rfp_documents." },
-        offset: { type: "integer", description: "Character offset to start from (default 0)." },
-        limit: { type: "integer", description: `Characters to return (default ${DOCUMENT_READ_LIMIT}, max ${DOCUMENT_READ_LIMIT}).` },
-      },
-      required: ["rfp_id", "document_id"],
-      additionalProperties: false,
-    },
-  },
-  {
-    type: "function",
-    name: "draft_rfp_summary",
-    description: `Propose a summary for an RFP. It is posted under your answer with a Save button; nothing is saved until a team member taps Save. Use it whenever someone asks you to write, update, or save a summary. Plain text, "- " bullets allowed, at most ${MAX_DRAFT_SUMMARY} characters.`,
-    parameters: {
-      type: "object",
-      properties: {
-        rfp_id: { type: "string", description: "RFP UUID from list_rfps." },
-        summary: { type: "string", description: "The complete summary text, exactly as it should be saved." },
-      },
-      required: ["rfp_id", "summary"],
-      additionalProperties: false,
-    },
-  },
-  {
-    type: "function",
-    name: "read_company_profile",
-    description:
-      "Read HTC Global's own company profile: overview and snapshot (ABN, address, certifications), services, delivery model, implementation methodology, timeline, responsibility matrix, inclusions, case studies, client references, insurance. Only call it when the question is about HTC Global itself or about how HTC fits a tender. Call without section to list the sections, then with a section title (or number) to read it.",
-    parameters: {
-      type: "object",
-      properties: {
-        section: { type: "string", description: 'Section title or number, e.g. "Case Studies" or "10". Omit to list sections.' },
-      },
-      additionalProperties: false,
-    },
-  },
-  { type: "web_search_preview" },
-];
-
-const offsetArg = z.coerce.number().int().nonnegative().catch(0);
-
-/** Tool arguments arrive as model-written JSON: parse them here, trust them below. */
-const toolCallSchema = z.discriminatedUnion("name", [
-  z.object({ name: z.literal("list_rfps"), args: z.object({}) }),
-  z.object({ name: z.literal("get_rfp_details"), args: z.object({ rfp_id: z.string().min(1) }) }),
-  z.object({
-    name: z.literal("list_rfp_documents"),
-    args: z.object({ rfp_id: z.string().min(1), offset: offsetArg.optional() }),
-  }),
-  z.object({
-    name: z.literal("read_rfp_document"),
-    args: z.object({
-      rfp_id: z.string().min(1),
-      document_id: z.string().min(1),
-      offset: offsetArg.optional(),
-      limit: z.coerce.number().int().min(1).max(DOCUMENT_READ_LIMIT).catch(DOCUMENT_READ_LIMIT).optional(),
-    }),
-  }),
-  z.object({ name: z.literal("read_company_profile"), args: z.object({ section: z.string().optional() }) }),
-  z.object({
-    name: z.literal("draft_rfp_summary"),
-    args: z.object({
-      rfp_id: z.string().min(1),
-      summary: z
-        .string()
-        .trim()
-        .min(1, "Summary text is empty; nothing drafted.")
-        .max(MAX_DRAFT_SUMMARY, `Summary is too long for one Telegram message; shorten it to under ${MAX_DRAFT_SUMMARY} characters.`),
-    }),
-  }),
-]);
-
-type SummaryDraft = { rfpId: string; summary: string; replacesExisting: boolean };
-
-/** What one answer touched, for the buttons under it: the RFPs it looked at and any summary draft. */
-type Turn = { rfpIds: Set<string>; draft: SummaryDraft | null };
-
-/** Shown on the "Looking into it…" message while each tool runs. */
-const TOOL_STATUS: Record<string, string> = {
-  list_rfps: "Checking the tender list…",
-  get_rfp_details: "Looking up the tender…",
-  list_rfp_documents: "Checking the tender's documents…",
-  read_rfp_document: "Reading the tender documents…",
-  read_company_profile: "Checking HTC's company profile…",
-  draft_rfp_summary: "Drafting the summary…",
-};
-
-async function handleToolCall(name: string, rawArgs: Record<string, unknown>, turn: Turn): Promise<string> {
-  const parsed = toolCallSchema.safeParse({ name, args: rawArgs });
-  if (!parsed.success) {
-    return `Invalid call to ${name}: ${parsed.error.issues.map((issue) => issue.message).join("; ")}`;
-  }
-
-  const call = parsed.data;
-  switch (call.name) {
-    case "list_rfps": {
-      const rfps = await listRfpDigest();
-
-      return JSON.stringify(
-        rfps.map((rfp) => ({
-          id: rfp.id,
-          client_name: rfp.client_name,
-          tender_code: rfp.tender_code,
-          status: rfp.status,
-          pipeline_stage: rfp.pipeline_stage,
-          closing_date: rfp.closing_date ?? rfp.closing_date_text,
-          summary_saved_at: rfp.summary_generated_at,
-          document_count: rfp.document_count,
-        })),
-      );
-    }
-
-    case "get_rfp_details": {
-      const rfp = await getRfp(call.args.rfp_id);
-      if (!rfp) return "RFP not found.";
-      turn.rfpIds.add(rfp.id);
-
-      return JSON.stringify({
-        id: rfp.id,
-        client_name: rfp.client_name,
-        tender_code: rfp.tender_code,
-        status: rfp.status,
-        pipeline_stage: rfp.pipeline_stage,
-        closing_date: rfp.closing_date,
-        closing_date_text: rfp.closing_date_text,
-        tender_link: rfp.tender_link,
-        description: rfp.description ? truncate(rfp.description, 2000) : null,
-        contact_person: rfp.contact_person,
-        contact_email: rfp.contact_email,
-        contact_phone: rfp.contact_phone,
-        notes: rfp.notes ? truncate(rfp.notes, 2000) : null,
-        summary: rfp.summary ? truncate(rfp.summary, 6000) : null,
-        summary_generated_at: rfp.summary_generated_at,
-      });
-    }
-
-    case "list_rfp_documents": {
-      const page = await listDocumentSummariesForChatgpt(call.args.rfp_id, {
-        offset: call.args.offset ?? 0,
-        limit: MAX_DOCUMENT_LIST_LIMIT,
-      });
-      if (!page) return "RFP not found.";
-      turn.rfpIds.add(call.args.rfp_id);
-      if (page.total === 0) return "This RFP has no converted documents yet.";
-
-      return JSON.stringify({
-        total: page.total,
-        next_offset: page.next_offset,
-        documents: page.documents.map((doc) => ({
-          id: doc.id,
-          title: doc.title,
-          source_type: doc.source_type,
-          length: doc.markdown_length,
-          preview: doc.markdown_preview.slice(0, PREVIEW_LENGTH),
-        })),
-      });
-    }
-
-    case "read_rfp_document": {
-      const lookup = await getDocumentExcerptForChatgpt(call.args.rfp_id, call.args.document_id, {
-        offset: call.args.offset ?? 0,
-        limit: call.args.limit ?? DOCUMENT_READ_LIMIT,
-      });
-      if (lookup.status === "rfp_not_found") return "RFP not found.";
-      if (lookup.status === "document_not_found") return "Document not found for this RFP.";
-      turn.rfpIds.add(call.args.rfp_id);
-
-      const doc = lookup.document;
-      return JSON.stringify({
-        title: doc.title,
-        offset: doc.offset,
-        total_length: doc.markdown_length,
-        next_offset: doc.next_offset,
-        markdown: doc.markdown,
-      });
-    }
-
-    case "read_company_profile":
-      return readCompanyProfile(call.args.section);
-
-    case "draft_rfp_summary": {
-      const rfp = await getRfp(call.args.rfp_id);
-      if (!rfp) return "RFP not found.";
-      turn.rfpIds.add(rfp.id);
-      turn.draft = { rfpId: rfp.id, summary: call.args.summary, replacesExisting: Boolean(rfp.summary) };
-      return `Draft ready for ${rfp.client_name}. It will be posted below your answer with a Save button${rfp.summary ? " (saving replaces the current summary)" : ""}. Don't repeat the summary in your answer - just introduce it in a sentence.`;
-    }
-
-    default: {
-      const _exhaustive: never = call;
-      return `Unknown tool: ${JSON.stringify(_exhaustive)}`;
-    }
-  }
-}
 
 function buildInstructions(askerName: string): string {
   return [
@@ -517,7 +285,7 @@ export async function answerQuestion(
     input: `${asker} asks: ${question}`,
     tools,
     onFunctionCall: (name, args) => {
-      const status = Object.hasOwn(TOOL_STATUS, name) ? TOOL_STATUS[name] : undefined;
+      const status = TOOL_STATUS.get(name);
       if (status) onStatus?.(status);
       return handleToolCall(name, args, turn);
     },
@@ -569,7 +337,7 @@ async function answerInChat({
   deadlineMs: number;
   memory: Promise<Memory | undefined>;
 }): Promise<void> {
-  const progress = await startProgress(message.chat.id, message.message_id);
+  const progress = startProgress(message.chat.id, message.message_id);
   const turn: Turn = { rfpIds: new Set(), draft: null };
 
   let reply: string;
@@ -591,10 +359,10 @@ async function answerInChat({
         : "Sorry, something went wrong on my side. Please try again in a moment.";
   }
 
-  const [first, ...rest] = splitTelegramMessage(reply, MESSAGE_CHUNK).map((text): OutgoingText => ({ text, markdown: true }));
-  const parts: [OutgoingText, ...OutgoingText[]] = [first, ...rest];
+  const parts = toParts(reply);
   if (answered) {
-    parts[parts.length - 1] = { ...parts[parts.length - 1], buttons: answerButtons(turn) };
+    const last = parts.length - 1;
+    parts[last] = { ...parts[last], buttons: answerButtons(turn) };
     if (turn.draft) parts.push(draftMessage(turn.draft));
   }
 
@@ -613,13 +381,13 @@ export async function handleTelegramMessage(message: TelegramMessage, { deadline
   if (!engagement.respond) return;
 
   // Memory doesn't depend on the access check, so start loading it now.
-  const memory = engagement.kind === "question" ? recall(message, botUser.id) : undefined;
+  const memory = engagement.kind === "question" ? recall(message, botUser.id) : Promise.resolve(undefined);
 
-  const allowedChatIds = parseAllowedChatIds(process.env.TELEGRAM_ALLOWED_CHAT_IDS);
-  const access = await chatAccess(message, allowedChatIds);
+  const allowed = allowedChatIds();
+  const access = await chatAccess({ chat: message.chat, userId: message.from?.id }, allowed);
   if (access !== "allowed") {
-    console.warn("Telegram bot refused chat:", { chatId: message.chat.id, access, allowedCount: allowedChatIds.size });
-    await sendTelegramMessage(message.chat.id, message.message_id, accessDeniedReply(access, message, allowedChatIds.size));
+    console.warn("Telegram bot refused chat:", { chatId: message.chat.id, access, allowedCount: allowed.size });
+    await sendTelegramMessage(message.chat.id, message.message_id, accessDeniedReply(access, message, allowed.size));
     return;
   }
 
@@ -645,7 +413,7 @@ export async function handleTelegramMessage(message: TelegramMessage, { deadline
       return;
 
     case "question":
-      await answerInChat({ message, question: engagement.question, botId: botUser.id, deadlineMs, memory: memory ?? recall(message, botUser.id) });
+      await answerInChat({ message, question: engagement.question, botId: botUser.id, deadlineMs, memory });
       return;
 
     default: {
@@ -679,8 +447,7 @@ export async function handleTelegramCallback(query: TelegramCallbackQuery, { dea
     return;
   }
 
-  const tapper: TelegramMessage = { message_id: source.message_id, chat: source.chat, from: query.from };
-  if ((await chatAccess(tapper, parseAllowedChatIds(process.env.TELEGRAM_ALLOWED_CHAT_IDS))) !== "allowed") {
+  if ((await chatAccess({ chat: source.chat, userId: query.from.id }, allowedChatIds())) !== "allowed") {
     await answerCallbackQuery(query.id, "Sorry, I only answer members of the team's RFPmanager group.");
     return;
   }
@@ -688,15 +455,23 @@ export async function handleTelegramCallback(query: TelegramCallbackQuery, { dea
   const action = parseCallbackData(query.data);
   switch (action.kind) {
     case "more": {
-      await answerCallbackQuery(query.id);
-      // Drop the button so a second tap doesn't ask the same thing again.
-      await editButtons(source.chat.id, source.message_id, withoutCallback(source.reply_markup?.inline_keyboard, MORE_DETAIL)).catch(
-        () => undefined,
-      );
+      const [botUser] = await Promise.all([
+        getBotUser(),
+        answerCallbackQuery(query.id),
+        // Drop the button so a second tap doesn't ask the same thing again.
+        editButtons(source.chat.id, source.message_id, withoutCallback(source.reply_markup?.inline_keyboard, MORE_DETAIL)).catch(
+          () => undefined,
+        ),
+      ]);
 
-      const botUser = await getBotUser();
       // A follow-up "asked" by whoever tapped, replying to the answer, so it joins that answer's thread.
-      const followUp: TelegramMessage = { ...tapper, text: MORE_DETAIL_QUESTION, reply_to_message: source };
+      const followUp: TelegramMessage = {
+        message_id: source.message_id,
+        chat: source.chat,
+        from: query.from,
+        text: MORE_DETAIL_QUESTION,
+        reply_to_message: source,
+      };
       await answerInChat({ message: followUp, question: MORE_DETAIL_QUESTION, botId: botUser.id, deadlineMs, memory: recall(followUp, botUser.id) });
       return;
     }
@@ -715,12 +490,14 @@ export async function handleTelegramCallback(query: TelegramCallbackQuery, { dea
         return;
       }
 
-      await answerCallbackQuery(query.id, "Saved to RFPmanager.");
       const label = `✅ Saved by ${displayName(query.from, "a team member")}`;
       const url = rfpPageUrl(action.rfpId);
-      await editButtons(source.chat.id, source.message_id, [[url ? { text: `${label} - open`, url } : { text: label, callback_data: "saved" }]]).catch(
-        () => undefined,
-      );
+      await Promise.all([
+        answerCallbackQuery(query.id, "Saved to RFPmanager."),
+        editButtons(source.chat.id, source.message_id, [[url ? { text: `${label} - open`, url } : { text: label, callback_data: "saved" }]]).catch(
+          () => undefined,
+        ),
+      ]);
       return;
     }
 
